@@ -24,11 +24,11 @@ body {
 /* ── Dark mode (default) ───────────────────────────────────── */
 :root {
   /* Brand */
-  --color-primary: #22c55e;
-  --color-primary-hover: #16a34a;
-  --color-accent: #00e676;
-  --color-accent-hover: #00ff84;
-  --color-accent-dark: #00c853;
+  --color-primary: #FFA200;
+  --color-primary-hover: #FF8C00;
+  --color-accent: #FF5722;
+  --color-accent-hover: #FF7043;
+  --color-accent-dark: #E64A19;
 
   /* Semantic surfaces */
   --color-bg: #0a0a0a;
@@ -63,9 +63,9 @@ body {
   --color-diff-challenging-text: #ff5252;
 
   /* Route colours (map) */
-  --color-route-full: #ff6600;
+  --color-route-full: #FFA200;
   --color-route-line: #888888;
-  --color-route-head: red;
+  --color-route-head: #E64A19;
 
   /* Typography */
   --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;

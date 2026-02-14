@@ -4,11 +4,8 @@
     <header class="header">
       <div class="header-content">
         <div class="logo">
-          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L4 7V17L12 22L20 17V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M12 8L8 10.5V15.5L12 18L16 15.5V10.5L12 8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          </svg>
-          <span class="logo-text">{{ eventName }}</span>
+          <img class="logo-icon" :src="logoSrc" :alt="eventName" />
+          <!--span class="logo-text">{{ eventName }}</span-->
         </div>
         
         <nav class="nav">
@@ -76,10 +73,7 @@
     <footer class="footer">
       <div class="footer-content">
         <div class="footer-logo">
-          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2L4 7V17L12 22L20 17V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-            <path d="M12 8L8 10.5V15.5L12 18L16 15.5V10.5L12 8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-          </svg>
+          <img class="logo-icon" :src="iconSrc" :alt="eventName" />
           <span>{{ eventName }}</span>
         </div>
         <div class="footer-links">
@@ -96,12 +90,16 @@
 <script>
 import eventData from '../assets/event.json';
 import { themeMixin } from '@/theme';
+import logoImage from '@/assets/event-logo.png';
+import iconImage from '@/assets/event-icon.png';
 
 export default {
   name: 'EventHome',
   mixins: [themeMixin],
   data() {
     return {
+      logoSrc: logoImage,
+      iconSrc: iconImage,
       city: eventData.city || 'City',
       eventName: eventData.eventName || 'Event',
       eventDate: eventData.eventDate || '2026-01-01',
@@ -183,9 +181,9 @@ export default {
 }
 
 .logo-icon {
-  width: 32px;
-  height: 32px;
-  color: var(--color-primary);
+  width: 120px;
+  height: 40px;
+  object-fit: contain;
 }
 
 .logo-text {
@@ -470,8 +468,8 @@ export default {
 }
 
 .footer-logo .logo-icon {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
 }
 
 .footer-links {

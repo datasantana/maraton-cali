@@ -19,11 +19,11 @@ const tokens = {
   /* ── Brand palette ────────────────────────────────────────── */
   colors: {
     brand: {
-      primary: '#22c55e',       // green accent used in buttons, dates
-      primaryHover: '#16a34a',  // hover state of primary
-      accent: '#00e676',        // vivid accent for playback UI
-      accentHover: '#00ff84',   // hover state of accent
-      accentDark: '#00c853',    // darker accent variant
+      primary: '#FFA200',       // green accent used in buttons, dates
+      primaryHover: '#FF8C00',  // hover state of primary
+      accent: '#FF5722',        // vivid accent for playback UI
+      accentHover: '#FF7043',   // hover state of accent
+      accentDark: '#E64A19',    // darker accent variant
     },
 
     /* ── Dark mode ───────────────────────────────────────────── */
@@ -80,11 +80,11 @@ const tokens = {
 
     /* ── Map route colours ───────────────────────────────────── */
     route: {
-      full: '#ff6600',
+      full: '#FFA200',
       animatedLine: '#888888',
-      head: 'red',
-      gradientStart: 'green',
-      gradientEnd: 'red',
+      head: '#E64A19',
+      gradientStart: '#006633',
+      gradientEnd: '#E64A19',
     },
   },
 
