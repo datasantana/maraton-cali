@@ -1,4 +1,4 @@
-# mmc-maps
+# maraton-cali
 
 ## Project setup
 ```
