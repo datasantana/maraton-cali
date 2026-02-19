@@ -10,7 +10,7 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 
 | Capa | Tecnología |
 |---|---|
-| Framework | **Vue 3** (Options API) + Vue Router 4 |
+| Framework | **Vue 3** (Composition API, `<script setup>`) + Vue Router 4 |
 | Mapa | **Mapbox GL JS 3.12** |
 | Cálculos geoespaciales | **Turf.js 3** (`turf.along`, `turf.lineDistance`) |
 | Build | **Vite 6** (Rollup) |
@@ -25,9 +25,12 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 ```
 src/
 ├── main.js                  # Punto de entrada — monta App, router, CSS global
-├── App.vue                  # Shell con <router-view/> y thema mixin
+├── App.vue                  # Shell con <router-view/> y useTheme composable
 │
 ├── router/index.js          # Rutas: / (home), /about, /route/:routeId
+│
+├── composables/
+│   └── useRouteAnimation.js # Composable de animación del mapa (capas, frame loop, controles)
 │
 ├── views/
 │   ├── HomeView.vue         # Landing page (wrapper de EventHome)
@@ -36,14 +39,15 @@ src/
 │
 ├── components/
 │   ├── EventHome.vue        # Landing: hero, grid de tarjetas de ruta, header, footer
-│   ├── RouteMap.vue         # Mapa Mapbox con animación del trayecto (capas, cámara)
+│   ├── RouteMap.vue         # Mapa Mapbox con animación vía useRouteAnimation composable
 │   ├── PlayBack.vue         # Barra de reproducción: play/pause, velocidad, scrub, stats
 │   └── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
 │
 ├── theme/
-│   ├── index.js             # Barrel export (themeMixin + tokens)
+│   ├── index.js             # Barrel export (useTheme + tokens)
 │   ├── tokens.js            # Tokens de diseño centralizados (colores, tipografía, layout)
-│   ├── themeMixin.js        # Mixin Options API — toggle dark/light, localStorage, cross-tab
+│   ├── useTheme.js          # Composable — toggle dark/light, localStorage, cross-tab sync
+│   ├── themeMixin.js        # (Legacy, ya no se importa — conservado como referencia)
 │   └── variables.css        # Custom properties CSS generadas desde tokens
 │
 ├── utils/
@@ -76,8 +80,9 @@ event.json ──▶ EventHome (tarjetas) ──▶ router-link /route/:id
 
 ### Sistema de temas
 
-- **`themeMixin`** se importa en `App.vue` y componentes que requieren `toggleTheme()`.
-- Agrega/quita la clase `.light-theme` en `<html>`.
+- **`useTheme()`** composable se usa en `App.vue` (inicialización global) y `EventHome.vue` (toggle).
+- Retorna `{ isLightTheme, toggleTheme }` — ref reactiva y función de toggle.
+- Agrega/quita la clase `.light-theme` en `<html>`, con persistencia en localStorage y sincronización cross-tab.
 - Las variables CSS en `variables.css` (`:root` = dark, `.light-theme` = light) se aplican globalmente.
 - `tokens.js` define los valores fuente; `variables.css` los mapea a custom properties.
 

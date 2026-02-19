@@ -87,60 +87,60 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { computed } from 'vue';
 import eventData from '../assets/event.json';
-import { themeMixin } from '@/theme';
+import { useTheme } from '@/theme';
 import logoImage from '@/assets/event-logo.png';
 import iconImage from '@/assets/event-icon.png';
 
-export default {
-  name: 'EventHome',
-  mixins: [themeMixin],
-  data() {
-    return {
-      logoSrc: logoImage,
-      iconSrc: iconImage,
-      city: eventData.city || 'City',
-      eventName: eventData.eventName || 'Event',
-      eventDate: eventData.eventDate || '2026-01-01',
-      routes: eventData.routes,
-      mapboxToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '',
-      mapboxStyle: 'mapbox://styles/mapbox/streets-v11',
-      mapCenterLng: import.meta.env.VITE_MAPBOX_CENTER_LNG || '-76.5410942407',
-      mapCenterLat: import.meta.env.VITE_MAPBOX_CENTER_LAT || '3.4300127118'
-    }
-  },
-  computed: {
-    formattedDate() {
-      const date = new Date(this.eventDate + 'T00:00:00');
-      return date.toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      });
-    },
-    eventYear() {
-      return this.eventDate.split('-')[0];
-    },
-    mapboxStylePath() {
-      // Convert mapbox://styles/username/styleId to username/styleId
-      return this.mapboxStyle.replace('mapbox://styles/', '');
-    }
-  },
-  methods: {
-    capitalizeFirst(str) {
-      return str.charAt(0).toUpperCase() + str.slice(1);
-    },
-    getStaticMapUrl(route) {
-      const zoom = route.zoom || 12;
-      return `https://api.mapbox.com/styles/v1/${this.mapboxStylePath}/static/${this.mapCenterLng},${this.mapCenterLat},${zoom},0/400x200?access_token=${this.mapboxToken}`;
-    },
-    scrollTo(id) {
-      const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth' });
-      }
-    }
+const { isLightTheme, toggleTheme } = useTheme();
+
+// --- Static data ---
+const logoSrc = logoImage;
+const iconSrc = iconImage;
+const city = eventData.city || 'City';
+const eventName = eventData.eventName || 'Event';
+const eventDate = eventData.eventDate || '2026-01-01';
+const routes = eventData.routes;
+const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+const mapboxStyle = 'mapbox://styles/mapbox/streets-v11';
+const mapCenterLng = import.meta.env.VITE_MAPBOX_CENTER_LNG || '-76.5410942407';
+const mapCenterLat = import.meta.env.VITE_MAPBOX_CENTER_LAT || '3.4300127118';
+
+// --- Computed ---
+
+const formattedDate = computed(() => {
+  const date = new Date(eventDate + 'T00:00:00');
+  return date.toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
+});
+
+const eventYear = computed(() => eventDate.split('-')[0]);
+
+const mapboxStylePath = computed(() => {
+  // Convert mapbox://styles/username/styleId to username/styleId
+  return mapboxStyle.replace('mapbox://styles/', '');
+});
+
+// --- Methods ---
+
+function capitalizeFirst(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+function getStaticMapUrl(route) {
+  const zoom = route.zoom || 12;
+  return `https://api.mapbox.com/styles/v1/${mapboxStylePath.value}/static/${mapCenterLng},${mapCenterLat},${zoom},0/400x200?access_token=${mapboxToken}`;
+}
+
+function scrollTo(id) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' });
   }
 }
 </script>
