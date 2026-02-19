@@ -7,8 +7,10 @@
  *
  *   import tokens from '@/theme/tokens';
  *
- * The CSS variables file (variables.css) is imported once in main.js.
+ * The CSS variables are auto-generated from tokens.js at build/dev time
+ * by the cssTokensPlugin (see vite.config.js + tokensToCSS.js).
  */
 
 export { useTheme } from './useTheme';
 export { default as tokens } from './tokens';
+export { tokensToCSS } from './tokensToCSS';

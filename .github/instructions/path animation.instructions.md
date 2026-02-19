@@ -28,6 +28,7 @@ src/
     useRouteAnimation.js    → Animación del mapa (capas, frame loop, controles)
   theme/
     useTheme.js             → Toggle dark/light, localStorage, cross-tab sync
+    tokensToCSS.js          → Generador: tokens.js → CSS custom properties
 ```
 
 ### 2.3 Estilo de componentes
@@ -43,8 +44,8 @@ src/
 
 ### 2.3 Sistema de temas
 
-- **Fuente de verdad**: `src/theme/tokens.js` define paletas, tipografía y layout.
-- **Variables CSS**: `src/theme/variables.css` mapea tokens a custom properties.  
+- **Fuente de verdad**: `src/theme/tokens.js` define paletas, tipografía, layout y transiciones.
+- **Variables CSS**: `src/theme/variables.css` es un shell; su contenido se genera automáticamente desde `tokens.js` por el Vite plugin `cssTokensPlugin` (vía `src/theme/tokensToCSS.js`).  
   - `:root` = modo oscuro (default).
   - `.light-theme` = modo claro.
 - **Composable**: `src/theme/useTheme.js` provee `isLightTheme` (ref) y `toggleTheme()`.  
@@ -127,13 +128,18 @@ Migración realizada. Todos los componentes usan `<script setup>` (Composition A
 Archivos nuevos: `src/theme/useTheme.js`, `src/composables/useRouteAnimation.js`.  
 Archivo legacy conservado: `src/theme/themeMixin.js` (ya no se importa).
 
-### 4.3 Eliminar duplicación de tokens (prioridad alta)
+### 4.3 Eliminar duplicación de tokens (prioridad alta) — ✅ COMPLETADO
 
-Actualmente `tokens.js` y `variables.css` definen los mismos valores por separado:
+Duplicación eliminada. `tokens.js` es la única fuente de verdad:
 
-1. Generar `variables.css` automáticamente desde `tokens.js` con un script de build (ej. `scripts/generate-css-vars.js`).
-2. O bien considerar CSS-in-JS con una función `tokensToCSS()` invocada en build time.
-3. Mientras se implementa, **cualquier cambio de color/fuente/layout debe hacerse en ambos archivos simultáneamente**; verificar coherencia.
+1. ✅ Creado `src/theme/tokensToCSS.js` — función pura `tokensToCSS(tokens)` que genera el CSS completo (reset + `:root` dark + `.light-theme`).
+2. ✅ Añadido Vite plugin `cssTokensPlugin` en `vite.config.js` que intercepta la carga de `variables.css` y retorna el CSS generado desde `tokens.js`.
+3. ✅ `variables.css` reducido a shell con comentario; su contenido real se genera en build/dev time.
+4. ✅ Tokens nuevos añadidos a `tokens.js`: `colors.light.accentDark` (override claro) y `transitions.theme`.
+
+Archivos nuevos: `src/theme/tokensToCSS.js`.  
+Archivos modificados: `tokens.js`, `variables.css`, `vite.config.js`.  
+**Nota**: cambios en `tokens.js` requieren reiniciar el dev server.
 
 ### 4.4 Homogeneizar CSS (prioridad alta)
 
