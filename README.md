@@ -32,6 +32,9 @@ src/
 ├── composables/
 │   └── useRouteAnimation.js # Composable de animación del mapa (capas, frame loop, controles)
 │
+├── config/
+│   └── mapbox.js            # Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
+│
 ├── views/
 │   ├── HomeView.vue         # Landing page (wrapper de EventHome)
 │   ├── RouteMapView.vue     # Vista de ruta — orquesta RouteMap + PlayBack + RaceTitle

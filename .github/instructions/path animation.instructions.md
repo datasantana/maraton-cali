@@ -14,8 +14,10 @@ Aplicación Vue 3 (Options API) que visualiza rutas de carrera sobre Mapbox GL J
 src/
   views/          → Vistas conectadas al router (wrappers delgados o orquestadores)
   components/     → Componentes reutilizables de UI
+  config/         → Configuración centralizada (Mapbox, etc.)
   theme/          → Tokens de diseño, mixin de tema, variables CSS
   utils/          → Funciones puras de utilidad
+  composables/    → Composables de dominio (lógica reutilizable)
   assets/         → Datos estáticos (JSON, GeoJSON, CSV, imágenes)
   router/         → Definición de rutas de Vue Router
 ```
@@ -24,6 +26,8 @@ src/
 
 ```
 src/
+  config/
+    mapbox.js               → Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
   composables/              → Composables de dominio (lógica reutilizable)
     useRouteAnimation.js    → Animación del mapa (capas, frame loop, controles)
   theme/
@@ -164,12 +168,16 @@ Extracción realizada:
 Archivos nuevos: `src/components/icons/Icon{Play,Pause,Moon,Sun,Calendar,Map}.vue`.  
 Archivos modificados: `PlayBack.vue`, `EventHome.vue`.
 
-### 4.6 Centralizar la configuración de Mapbox (prioridad media)
+### 4.6 Centralizar la configuración de Mapbox (prioridad media) — ✅ COMPLETADO
 
-La configuración de Mapbox se lee de `process.env` en múltiples lugares (`RouteMap.vue`, `EventHome.vue`):
+Configuración centralizada. `src/config/mapbox.js` es la única fuente de lectura de variables de entorno Mapbox:
 
-1. Crear `src/config/mapbox.js` que exporte un objeto con `accessToken`, `style`, `center`, `zoom`, `pitch`.
-2. Importar ese objeto en lugar de leer `process.env` directamente en cada componente.
+1. ✅ Creado `src/config/mapbox.js` — exporta `mapboxConfig` (objeto congelado con `accessToken`, `style`, `center`, `zoom`, `pitch`), `staticMapStyle` y helper `staticMapStylePath()`.
+2. ✅ `RouteMap.vue` actualizado: importa `mapboxConfig` en lugar de leer `import.meta.env` directamente.
+3. ✅ `EventHome.vue` actualizado: importa `mapboxConfig` y `staticMapStylePath` en lugar de duplicar lecturas de env.
+
+Archivos nuevos: `src/config/mapbox.js`.  
+Archivos modificados: `RouteMap.vue`, `EventHome.vue`.
 
 ### 4.7 Limpieza de código existente (prioridad alta)
 

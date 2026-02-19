@@ -86,6 +86,7 @@ import IconMoon from '@/components/icons/IconMoon.vue';
 import IconSun from '@/components/icons/IconSun.vue';
 import IconCalendar from '@/components/icons/IconCalendar.vue';
 import IconMap from '@/components/icons/IconMap.vue';
+import { mapboxConfig, staticMapStylePath } from '@/config/mapbox';
 
 const { isLightTheme, toggleTheme } = useTheme();
 
@@ -96,10 +97,8 @@ const city = eventData.city || 'City';
 const eventName = eventData.eventName || 'Event';
 const eventDate = eventData.eventDate || '2026-01-01';
 const routes = eventData.routes;
-const mapboxToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
-const mapboxStyle = 'mapbox://styles/mapbox/streets-v11';
-const mapCenterLng = import.meta.env.VITE_MAPBOX_CENTER_LNG || '-76.5410942407';
-const mapCenterLat = import.meta.env.VITE_MAPBOX_CENTER_LAT || '3.4300127118';
+const mapboxToken = mapboxConfig.accessToken;
+const [mapCenterLng, mapCenterLat] = mapboxConfig.center;
 
 // --- Computed ---
 
@@ -114,10 +113,7 @@ const formattedDate = computed(() => {
 
 const eventYear = computed(() => eventDate.split('-')[0]);
 
-const mapboxStylePath = computed(() => {
-  // Convert mapbox://styles/username/styleId to username/styleId
-  return mapboxStyle.replace('mapbox://styles/', '');
-});
+const mapboxStylePath = computed(() => staticMapStylePath());
 
 // --- Methods ---
 
