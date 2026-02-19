@@ -16,7 +16,7 @@
         :playing="isPlaying"
         :speed="currentSpeed"
         :showMarks="false"
-        :fullscreenContainer="$refs.routeViewContainer"
+        :fullscreenContainer="routeViewContainer"
         @update:progress="onMapProgress"
       />
       <RaceTitle
@@ -42,7 +42,9 @@
   </div>
 </template>
 
-<script>
+<script setup>
+import { ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import RouteMap from '@/components/RouteMap.vue';
 import PlayBack from '@/components/PlayBack.vue';
 import RaceTitle from '@/components/RaceTitle.vue';
@@ -61,141 +63,133 @@ const ROUTE_MAP = Object.fromEntries(
 // Event-level city from centralized config
 const EVENT_CITY = eventData.city || '';
 
-export default {
-  name: 'RouteMapView',
-  components: {
-    RouteMap,
-    PlayBack,
-    RaceTitle,
-  },
-  data() {
-    return {
-      // Route data
-      pathData: null,
-      marksData: null,
-      elevationProfile: [],
-      totalDistance: 0,
-      duration: 300000,
-      // Event-level city
-      eventCity: EVENT_CITY,
-      // Route metadata for RaceTitle
-      routeConfig: null,
-      // Shared playback state — single source of truth for both children
-      progress: 0,
-      isPlaying: false,
-      currentSpeed: 1,
-      // Loading state
-      loading: true,
-      error: null,
-    };
-  },
-  watch: {
-    '$route.params.routeId': {
-      immediate: true,
-      handler(routeId) {
-        this.loadRouteData(routeId);
-      },
-    },
-  },
-  methods: {
-    async loadRouteData(routeId) {
-      this.loading = true;
-      this.error = null;
-      this.pathData = null;
-      this.marksData = null;
-      this.elevationProfile = [];
-      this.totalDistance = 0;
-      this.routeConfig = null;
-      this.progress = 0;
-      this.isPlaying = false;
-      this.currentSpeed = 1;
+const route = useRoute();
 
-      const config = ROUTE_MAP[routeId];
-      if (!config) {
-        this.error = `Route "${routeId}" not found.`;
-        this.loading = false;
-        return;
+// --- Route data ---
+const pathData = ref(null);
+const marksData = ref(null);
+const elevationProfile = ref([]);
+const totalDistance = ref(0);
+const duration = ref(300000);
+const eventCity = EVENT_CITY;
+const routeConfig = ref(null);
+
+// --- Shared playback state — single source of truth for both children ---
+const progress = ref(0);
+const isPlaying = ref(false);
+const currentSpeed = ref(1);
+
+// --- Loading state ---
+const loading = ref(true);
+const error = ref(null);
+
+// --- Template ref for fullscreen container ---
+const routeViewContainer = ref(null);
+
+// --- Data loading ---
+async function loadRouteData(routeId) {
+  loading.value = true;
+  error.value = null;
+  pathData.value = null;
+  marksData.value = null;
+  elevationProfile.value = [];
+  totalDistance.value = 0;
+  routeConfig.value = null;
+  progress.value = 0;
+  isPlaying.value = false;
+  currentSpeed.value = 1;
+
+  const config = ROUTE_MAP[routeId];
+  if (!config) {
+    error.value = `Route "${routeId}" not found.`;
+    loading.value = false;
+    return;
+  }
+
+  routeConfig.value = config;
+
+  try {
+    if (config.legacy) {
+      // Legacy route: separate path + marks JSON files in routes/ and marks/
+      const [pathModule, marksModule] = await Promise.all([
+        import(`@/assets/routes/${routeId}.json`),
+        import(`@/assets/marks/${routeId}.json`),
+      ]);
+      pathData.value = pathModule.default || pathModule;
+      marksData.value = marksModule.default || marksModule;
+      elevationProfile.value = [];
+      totalDistance.value = 0;
+    } else {
+      // Standard route: GeoJSON + elevation CSV
+      const [geojsonModule, csvModule] = await Promise.all([
+        import(`@/assets/routes/${routeId}.geojson`),
+        import(`@/assets/elevation/${routeId}.csv?raw`),
+      ]);
+
+      const geojson = geojsonModule.default || geojsonModule;
+      const csvText = csvModule.default || csvModule;
+
+      // Split GeoJSON into:
+      //   - pathData:  FeatureCollection with the LineString (route geometry)
+      //   - marksData: FeatureCollection with Point features (enriched waypoints)
+      const lineFeature = geojson.features.find(f => f.geometry.type === 'LineString');
+      const pointFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
+
+      pathData.value = {
+        type: 'FeatureCollection',
+        features: lineFeature ? [lineFeature] : [],
+      };
+
+      // Marks preserved for future use (currently showMarks=false on RouteMap)
+      marksData.value = {
+        type: 'FeatureCollection',
+        features: pointFeatures,
+      };
+
+      // Parse elevation CSV into numeric-typed array
+      elevationProfile.value = parseElevationCsv(csvText);
+
+      // Total distance from the last profile point
+      if (elevationProfile.value.length > 0) {
+        totalDistance.value = elevationProfile.value[elevationProfile.value.length - 1].distance_km_cum;
       }
+    }
 
-      this.routeConfig = config;
+    duration.value = config.duration;
+  } catch (err) {
+    console.error('Failed to load route data:', err);
+    error.value = 'Failed to load route data.';
+  } finally {
+    loading.value = false;
+  }
+}
 
-      try {
-        if (config.legacy) {
-          // Legacy route: separate path + marks JSON files in routes/ and marks/
-          const [pathModule, marksModule] = await Promise.all([
-            import(`@/assets/routes/${routeId}.json`),
-            import(`@/assets/marks/${routeId}.json`),
-          ]);
-          this.pathData = pathModule.default || pathModule;
-          this.marksData = marksModule.default || marksModule;
-          this.elevationProfile = [];
-          this.totalDistance = 0;
-        } else {
-          // Standard route: GeoJSON + elevation CSV
-          const [geojsonModule, csvModule] = await Promise.all([
-            import(`@/assets/routes/${routeId}.geojson`),
-            import(`@/assets/elevation/${routeId}.csv?raw`),
-          ]);
+// --- Event handlers ---
 
-          const geojson = geojsonModule.default || geojsonModule;
-          const csvText = csvModule.default || csvModule;
+// Animation drives progress updates — RouteMap → parent → PlayBack
+function onMapProgress(val) {
+  progress.value = val;
+}
 
-          // Split GeoJSON into:
-          //   - pathData:  FeatureCollection with the LineString (route geometry)
-          //   - marksData: FeatureCollection with Point features (enriched waypoints)
-          const lineFeature = geojson.features.find(f => f.geometry.type === 'LineString');
-          const pointFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
+// Scrub drives progress updates — PlayBack → parent → RouteMap
+function onPlaybackScrub(val) {
+  progress.value = val;
+}
 
-          this.pathData = {
-            type: 'FeatureCollection',
-            features: lineFeature ? [lineFeature] : [],
-          };
+// Play/pause state — PlayBack → parent → RouteMap (via playing prop)
+function onTogglePlay(playing) {
+  isPlaying.value = playing;
+}
 
-          // Marks preserved for future use (currently showMarks=false on RouteMap)
-          this.marksData = {
-            type: 'FeatureCollection',
-            features: pointFeatures,
-          };
+// Speed change — PlayBack → parent → RouteMap (via speed prop)
+function onSpeedChange(speed) {
+  currentSpeed.value = speed;
+}
 
-          // Parse elevation CSV into numeric-typed array
-          this.elevationProfile = parseElevationCsv(csvText);
-
-          // Total distance from the last profile point
-          if (this.elevationProfile.length > 0) {
-            this.totalDistance = this.elevationProfile[this.elevationProfile.length - 1].distance_km_cum;
-          }
-        }
-
-        this.duration = config.duration;
-      } catch (err) {
-        console.error('Failed to load route data:', err);
-        this.error = 'Failed to load route data.';
-      } finally {
-        this.loading = false;
-      }
-    },
-
-    // Animation drives progress updates — RouteMap → parent → PlayBack
-    onMapProgress(val) {
-      this.progress = val;
-    },
-
-    // Scrub drives progress updates — PlayBack → parent → RouteMap
-    onPlaybackScrub(val) {
-      this.progress = val;
-    },
-
-    // Play/pause state — PlayBack → parent → RouteMap (via playing prop)
-    onTogglePlay(playing) {
-      this.isPlaying = playing;
-    },
-
-    // Speed change — PlayBack → parent → RouteMap (via speed prop)
-    onSpeedChange(speed) {
-      this.currentSpeed = speed;
-    },
-  },
-};
+// --- Route change watcher ---
+watch(() => route.params.routeId, (routeId) => {
+  loadRouteData(routeId);
+}, { immediate: true });
 </script>
 
 <style scoped>

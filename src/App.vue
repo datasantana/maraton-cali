@@ -2,13 +2,11 @@
   <router-view/>
 </template>
 
-<script>
-import { themeMixin } from '@/theme';
+<script setup>
+import { useTheme } from '@/theme';
 
-export default {
-  name: 'App',
-  mixins: [themeMixin],
-};
+// Initialize global theme (dark/light class on <html>, localStorage, cross-tab sync)
+useTheme();
 </script>
 
 <style>

@@ -87,238 +87,236 @@
   </div>
 </template>
 
-<script>
-import { themeMixin } from '@/theme';
+<script setup>
+import { ref, computed, onBeforeUnmount } from 'vue';
 
-export default {
-  name: 'PlayBack',
-  mixins: [themeMixin],
-  props: {
-    playing: {
-      type: Boolean,
-      default: true,
-    },
-    // Current progress (0–1) driven by parent, synced with RouteMap animation
-    progress: {
-      type: Number,
-      default: 0,
-    },
-    // Parsed elevation profile data from CSV
-    // Each object: { lat, lon, ele, time, segment_distance_km, distance_km_cum,
-    //                segment_time_s, elev_delta_m, elev_gain_pos_m, elev_gain_pos_cum_m, slope_percent }
-    elevationProfile: {
-      type: Array,
-      default: () => [],
-    },
-    // Total route distance in km (from the last profile point)
-    totalDistance: {
-      type: Number,
-      default: 0,
-    },
-    // Mark highlights on the profile — kept for future use
-    profileMarks: {
-      type: Array,
-      default: () => [],
-    },
+const props = defineProps({
+  playing: {
+    type: Boolean,
+    default: true,
   },
-  emits: ['toggle-play', 'speed-change', 'update:progress'],
-  data() {
-    return {
-      speedOptions: [1, 1.5, 2, 3, 5],
-      speedIndex: 0,
-      isScrubbing: false,
-    };
+  // Current progress (0–1) driven by parent, synced with RouteMap animation
+  progress: {
+    type: Number,
+    default: 0,
   },
-  computed: {
-    isPlaying() {
-      return this.playing;
-    },
-    progressPercent() {
-      return Math.min(this.progress * 100, 100);
-    },
-    // Find the nearest elevation profile point for the current progress
-    currentProfilePoint() {
-      if (!this.elevationProfile || this.elevationProfile.length === 0) {
-        return null;
-      }
-      const currentDist = this.progress * this.totalDistance;
-      return this._findNearestPoint(currentDist);
-    },
-    formattedDistance() {
-      const dist = this.progress * this.totalDistance;
-      return dist.toFixed(1);
-    },
-    formattedElevation() {
-      if (!this.currentProfilePoint) return '0';
-      return Math.round(this.currentProfilePoint.ele);
-    },
-    formattedSlope() {
-      if (!this.currentProfilePoint) return '+0.0%';
-      const slope = this.currentProfilePoint.slope_percent;
-      const sign = slope >= 0 ? '+' : '';
-      return `${sign}${slope.toFixed(1)}%`;
-    },
-    formattedTotalAscent() {
-      if (!this.currentProfilePoint) return '0';
-      return Math.round(this.currentProfilePoint.elev_gain_pos_cum_m);
-    },
-    formattedTime() {
-      if (!this.elevationProfile || this.elevationProfile.length === 0 || !this.currentProfilePoint) {
-        return '00:00:00';
-      }
-      // Compute elapsed time from route data timestamps
-      const startTime = new Date(this.elevationProfile[0].time).getTime();
-      const currentTime = new Date(this.currentProfilePoint.time).getTime();
-      const totalSeconds = Math.max(0, Math.floor((currentTime - startTime) / 1000));
-      const h = Math.floor(totalSeconds / 3600);
-      const m = Math.floor((totalSeconds % 3600) / 60);
-      const s = totalSeconds % 60;
-      return [
-        String(h).padStart(2, '0'),
-        String(m).padStart(2, '0'),
-        String(s).padStart(2, '0'),
-      ].join(':');
-    },
-    currentSpeed() {
-      const speed = this.speedOptions[this.speedIndex];
-      return Number.isInteger(speed) ? speed : speed.toFixed(1);
-    },
-    // Generate SVG polyline points from real elevation profile data
-    elevationPoints() {
-      if (!this.elevationProfile || this.elevationProfile.length === 0) {
-        // Fallback placeholder when no profile data is available (legacy routes)
-        return '0,20 15,18 30,15 50,19 70,14 90,17 110,12 130,16 150,10 170,13 190,8 210,12 230,6 250,10 270,8 290,12 300,10';
-      }
-
-      const profile = this.elevationProfile;
-      const maxDist = this.totalDistance || profile[profile.length - 1].distance_km_cum || 1;
-
-      // Find elevation range for Y-axis scaling
-      let minEle = Infinity, maxEle = -Infinity;
-      for (const p of profile) {
-        if (p.ele < minEle) minEle = p.ele;
-        if (p.ele > maxEle) maxEle = p.ele;
-      }
-      const eleRange = maxEle - minEle || 1; // avoid division by zero
-
-      // Downsample to ~150 points for a smooth SVG without excessive DOM nodes
-      const maxPoints = 150;
-      const step = Math.max(1, Math.floor(profile.length / maxPoints));
-
-      const points = [];
-      for (let i = 0; i < profile.length; i += step) {
-        const p = profile[i];
-        const x = (p.distance_km_cum / maxDist) * 300;
-        const y = 40 - ((p.ele - minEle) / eleRange) * 34 - 3; // 3px top padding, 34px usable range
-        points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-      }
-
-      // Always include the last point for a complete profile
-      const last = profile[profile.length - 1];
-      const lastX = (last.distance_km_cum / maxDist) * 300;
-      const lastY = 40 - ((last.ele - minEle) / eleRange) * 34 - 3;
-      points.push(`${lastX.toFixed(1)},${lastY.toFixed(1)}`);
-
-      return points.join(' ');
-    },
+  // Parsed elevation profile data from CSV
+  // Each object: { lat, lon, ele, time, segment_distance_km, distance_km_cum,
+  //                segment_time_s, elev_delta_m, elev_gain_pos_m, elev_gain_pos_cum_m, slope_percent }
+  elevationProfile: {
+    type: Array,
+    default: () => [],
   },
-  beforeUnmount() {
-    // Clean up scrub listeners in case component unmounts during a drag
-    if (this._onScrubMove) {
-      document.removeEventListener('mousemove', this._onScrubMove);
+  // Total route distance in km (from the last profile point)
+  totalDistance: {
+    type: Number,
+    default: 0,
+  },
+  // Mark highlights on the profile — kept for future use
+  profileMarks: {
+    type: Array,
+    default: () => [],
+  },
+});
+
+const emit = defineEmits(['toggle-play', 'speed-change', 'update:progress']);
+
+// --- Reactive state ---
+const speedOptions = [1, 1.5, 2, 3, 5];
+const speedIndex = ref(0);
+const isScrubbing = ref(false);
+
+// Template ref for scrub interaction
+const progressTrack = ref(null);
+
+// --- Private scrub handlers (non-reactive, captured in closures) ---
+let _onScrubMove = null;
+let _onScrubEnd = null;
+
+// --- Computed properties ---
+
+const isPlaying = computed(() => props.playing);
+
+const progressPercent = computed(() => Math.min(props.progress * 100, 100));
+
+// Binary search for the nearest elevation profile point by cumulative distance
+function findNearestPoint(distanceKm) {
+  const profile = props.elevationProfile;
+  if (!profile || profile.length === 0) return null;
+
+  let lo = 0;
+  let hi = profile.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (profile[mid].distance_km_cum < distanceKm) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
     }
-    if (this._onScrubEnd) {
-      document.removeEventListener('mouseup', this._onScrubEnd);
+  }
+  return profile[lo];
+}
+
+const currentProfilePoint = computed(() => {
+  if (!props.elevationProfile || props.elevationProfile.length === 0) {
+    return null;
+  }
+  const currentDist = props.progress * props.totalDistance;
+  return findNearestPoint(currentDist);
+});
+
+const formattedDistance = computed(() => {
+  const dist = props.progress * props.totalDistance;
+  return dist.toFixed(1);
+});
+
+const formattedElevation = computed(() => {
+  if (!currentProfilePoint.value) return '0';
+  return Math.round(currentProfilePoint.value.ele);
+});
+
+const formattedSlope = computed(() => {
+  if (!currentProfilePoint.value) return '+0.0%';
+  const slope = currentProfilePoint.value.slope_percent;
+  const sign = slope >= 0 ? '+' : '';
+  return `${sign}${slope.toFixed(1)}%`;
+});
+
+const formattedTotalAscent = computed(() => {
+  if (!currentProfilePoint.value) return '0';
+  return Math.round(currentProfilePoint.value.elev_gain_pos_cum_m);
+});
+
+const formattedTime = computed(() => {
+  if (!props.elevationProfile || props.elevationProfile.length === 0 || !currentProfilePoint.value) {
+    return '00:00:00';
+  }
+  const startTime = new Date(props.elevationProfile[0].time).getTime();
+  const currentTime = new Date(currentProfilePoint.value.time).getTime();
+  const totalSeconds = Math.max(0, Math.floor((currentTime - startTime) / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return [
+    String(h).padStart(2, '0'),
+    String(m).padStart(2, '0'),
+    String(s).padStart(2, '0'),
+  ].join(':');
+});
+
+const currentSpeed = computed(() => {
+  const speed = speedOptions[speedIndex.value];
+  return Number.isInteger(speed) ? speed : speed.toFixed(1);
+});
+
+// Generate SVG polyline points from real elevation profile data
+const elevationPoints = computed(() => {
+  if (!props.elevationProfile || props.elevationProfile.length === 0) {
+    // Fallback placeholder when no profile data is available (legacy routes)
+    return '0,20 15,18 30,15 50,19 70,14 90,17 110,12 130,16 150,10 170,13 190,8 210,12 230,6 250,10 270,8 290,12 300,10';
+  }
+
+  const profile = props.elevationProfile;
+  const maxDist = props.totalDistance || profile[profile.length - 1].distance_km_cum || 1;
+
+  // Find elevation range for Y-axis scaling
+  let minEle = Infinity, maxEle = -Infinity;
+  for (const p of profile) {
+    if (p.ele < minEle) minEle = p.ele;
+    if (p.ele > maxEle) maxEle = p.ele;
+  }
+  const eleRange = maxEle - minEle || 1;
+
+  // Downsample to ~150 points for a smooth SVG without excessive DOM nodes
+  const maxPoints = 150;
+  const step = Math.max(1, Math.floor(profile.length / maxPoints));
+
+  const points = [];
+  for (let i = 0; i < profile.length; i += step) {
+    const p = profile[i];
+    const x = (p.distance_km_cum / maxDist) * 300;
+    const y = 40 - ((p.ele - minEle) / eleRange) * 34 - 3;
+    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+
+  // Always include the last point for a complete profile
+  const last = profile[profile.length - 1];
+  const lastX = (last.distance_km_cum / maxDist) * 300;
+  const lastY = 40 - ((last.ele - minEle) / eleRange) * 34 - 3;
+  points.push(`${lastX.toFixed(1)},${lastY.toFixed(1)}`);
+
+  return points.join(' ');
+});
+
+// --- Methods ---
+
+function togglePlay() {
+  emit('toggle-play', !isPlaying.value);
+}
+
+function cycleSpeed() {
+  speedIndex.value = (speedIndex.value + 1) % speedOptions.length;
+  emit('speed-change', speedOptions[speedIndex.value]);
+}
+
+// Compute progress (0–1) from pointer X position on the track
+function updateScrubProgress(event) {
+  const track = progressTrack.value;
+  if (!track) return;
+
+  const rect = track.getBoundingClientRect();
+  const x = event.clientX - rect.left;
+  const progress = Math.max(0, Math.min(1, x / rect.width));
+  emit('update:progress', progress);
+}
+
+// --- Scrub interaction: mouse ---
+function onScrubStart(event) {
+  isScrubbing.value = true;
+  updateScrubProgress(event);
+
+  _onScrubMove = (e) => {
+    if (isScrubbing.value) {
+      updateScrubProgress(e);
     }
-  },
-  methods: {
-    togglePlay() {
-      this.$emit('toggle-play', !this.isPlaying);
-    },
-    cycleSpeed() {
-      this.speedIndex = (this.speedIndex + 1) % this.speedOptions.length;
-      this.$emit('speed-change', this.speedOptions[this.speedIndex]);
-    },
+  };
+  _onScrubEnd = () => {
+    isScrubbing.value = false;
+    document.removeEventListener('mousemove', _onScrubMove);
+    document.removeEventListener('mouseup', _onScrubEnd);
+  };
+  document.addEventListener('mousemove', _onScrubMove);
+  document.addEventListener('mouseup', _onScrubEnd);
+}
 
-    // --- Binary search for the nearest profile point by cumulative distance ---
-    _findNearestPoint(distanceKm) {
-      const profile = this.elevationProfile;
-      if (!profile || profile.length === 0) return null;
+// --- Scrub interaction: touch ---
+function onTouchScrubStart(event) {
+  isScrubbing.value = true;
+  updateScrubProgress(event.touches[0]);
 
-      let lo = 0;
-      let hi = profile.length - 1;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (profile[mid].distance_km_cum < distanceKm) {
-          lo = mid + 1;
-        } else {
-          hi = mid;
-        }
-      }
-      return profile[lo];
-    },
+  const onTouchMove = (e) => {
+    if (isScrubbing.value) {
+      updateScrubProgress(e.touches[0]);
+    }
+  };
+  const onTouchEnd = () => {
+    isScrubbing.value = false;
+    document.removeEventListener('touchmove', onTouchMove);
+    document.removeEventListener('touchend', onTouchEnd);
+  };
+  document.addEventListener('touchmove', onTouchMove, { passive: true });
+  document.addEventListener('touchend', onTouchEnd);
+}
 
-    // --- Scrub interaction: mouse ---
-    onScrubStart(event) {
-      this.isScrubbing = true;
-      this._updateScrubProgress(event);
-
-      this._onScrubMove = (e) => {
-        if (this.isScrubbing) {
-          this._updateScrubProgress(e);
-        }
-      };
-      this._onScrubEnd = () => {
-        this.isScrubbing = false;
-        document.removeEventListener('mousemove', this._onScrubMove);
-        document.removeEventListener('mouseup', this._onScrubEnd);
-      };
-      document.addEventListener('mousemove', this._onScrubMove);
-      document.addEventListener('mouseup', this._onScrubEnd);
-    },
-
-    // --- Scrub interaction: touch ---
-    onTouchScrubStart(event) {
-      this.isScrubbing = true;
-      this._updateScrubProgress(event.touches[0]);
-
-      const onTouchMove = (e) => {
-        if (this.isScrubbing) {
-          this._updateScrubProgress(e.touches[0]);
-        }
-      };
-      const onTouchEnd = () => {
-        this.isScrubbing = false;
-        document.removeEventListener('touchmove', onTouchMove);
-        document.removeEventListener('touchend', onTouchEnd);
-      };
-      document.addEventListener('touchmove', onTouchMove, { passive: true });
-      document.addEventListener('touchend', onTouchEnd);
-    },
-
-    // Compute progress (0–1) from pointer X position on the track
-    _updateScrubProgress(event) {
-      const track = this.$refs.progressTrack;
-      if (!track) return;
-
-      const rect = track.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const progress = Math.max(0, Math.min(1, x / rect.width));
-      this.$emit('update:progress', progress);
-    },
-
-    // --- Profile marks (kept for future use) ---
-    // Call this method to compute X positions for marks on the profile chart.
-    // Uncomment and use when marks are reactivated.
-    // getProfileMarkPositions() {
-    //   if (!this.profileMarks || this.profileMarks.length === 0) return [];
-    //   return this.profileMarks.map(mark => ({
-    //     ...mark,
-    //     xPercent: (mark.distance_km_cum / this.totalDistance) * 100,
-    //   }));
-    // },
-  },
-};
+// --- Cleanup ---
+onBeforeUnmount(() => {
+  if (_onScrubMove) {
+    document.removeEventListener('mousemove', _onScrubMove);
+  }
+  if (_onScrubEnd) {
+    document.removeEventListener('mouseup', _onScrubEnd);
+  }
+});
 </script>
 
 <style scoped>
