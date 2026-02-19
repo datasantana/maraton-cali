@@ -51,19 +51,21 @@ src/
 
 ### 2.5 Variables de entorno
 
-Prefijo `VUE_APP_` (requisito Vue CLI). Definidas en `.env`:
+Prefijo `VITE_` (requisito Vite). Definidas en `.env`:
 
 | Variable | Descripción |
 |---|---|
-| `VUE_APP_MAPBOX_ACCESS_TOKEN` | Token de Mapbox |
-| `VUE_APP_MAPBOX_STYLE` | URL del estilo del mapa |
-| `VUE_APP_MAPBOX_CENTER_LNG` | Longitud del centro del mapa |
-| `VUE_APP_MAPBOX_CENTER_LAT` | Latitud del centro del mapa |
+| `VITE_MAPBOX_ACCESS_TOKEN` | Token de Mapbox |
+| `VITE_MAPBOX_STYLE` | URL del estilo del mapa |
+| `VITE_MAPBOX_CENTER_LNG` | Longitud del centro del mapa |
+| `VITE_MAPBOX_CENTER_LAT` | Latitud del centro del mapa |
 
 ### 2.6 Importaciones y alias
 
-- Usar `@/` como alias de `src/` (configurado en `jsconfig.json` y webpack).
-- Imports dinámicos con `import()` + webpackChunkName para lazy-loading de vistas y assets.
+- Usar `@/` como alias de `src/` (configurado en `jsconfig.json` y `vite.config.js`).
+- Imports dinámicos con `import()` para lazy-loading de vistas y assets.
+- Archivos `.csv` se importan con sufijo `?raw` para obtener texto plano.
+- Archivos `.geojson` se transforman a módulos JSON mediante plugin custom en `vite.config.js`.
 
 ---
 
@@ -94,57 +96,9 @@ La animación en `RouteMap.vue` se gestiona mediante closures dentro de `setupAn
 
 ## 4. Instrucciones para refactorización y homogeneización
 
-### 4.1 Migrar de Vue CLI a Vite (prioridad crítica)
+### 4.1 Migrar de Vue CLI a Vite — ✅ COMPLETADO
 
-Vue CLI 5 está en modo mantenimiento y usa Webpack 5. Vite ofrece arranque instantáneo (ESM nativo), HMR ultra-rápido y builds con Rollup más pequeños. Esta migración es prerequisito para otras mejoras (Vitest, `<script setup>` sin configuración extra, path aliases nativos).
-
-**Pasos de migración:**
-
-1. **Crear `vite.config.js`** en la raíz:
-   ```js
-   import { defineConfig } from 'vite';
-   import vue from '@vitejs/plugin-vue';
-   import path from 'path';
-
-   export default defineConfig({
-     plugins: [vue()],
-     base: process.env.NODE_ENV === 'production' ? '/maraton-cali/' : '/',
-     resolve: {
-       alias: {
-         '@': path.resolve(__dirname, 'src'),
-       },
-     },
-     assetsInclude: ['**/*.csv'],
-   });
-   ```
-2. **Mover `public/index.html` → `index.html`** (raíz del proyecto). Eliminar las interpolaciones `<%= ... %>` de Webpack y reemplazarlas por valores estáticos. Agregar `<script type="module" src="/src/main.js"></script>` antes de `</body>`.
-3. **Instalar dependencias de Vite**:
-   ```bash
-   npm install -D vite @vitejs/plugin-vue
-   ```
-4. **Actualizar `package.json` scripts**:
-   ```json
-   "scripts": {
-     "dev": "vite",
-     "build": "vite build",
-     "preview": "vite preview",
-     "lint": "eslint src --ext .js,.vue"
-   }
-   ```
-5. **Variables de entorno**: renombrar prefijo `VUE_APP_` → `VITE_` en `.env` y `.env.example`. En código, reemplazar `process.env.VUE_APP_*` → `import.meta.env.VITE_*` y `process.env.NODE_ENV` → `import.meta.env.MODE`.
-6. **Importación de assets**:
-   - `.csv`: usar `?raw` suffix en el import (`import csv from '@/assets/elevation/15k.csv?raw'`) o configurar `assetsInclude` en `vite.config.js`.
-   - `.geojson`: Vite importa JSON nativamente; verificar que los dynamic imports funcionen sin webpack magic comments.
-   - Eliminar la configuración `chainWebpack` de `vue.config.js`.
-7. **Eliminar archivos y dependencias de Vue CLI**:
-   - Eliminar: `vue.config.js`, `babel.config.js`, `jsconfig.json` (reemplazar por `tsconfig.json` o `jsconfig.json` simplificado si se necesita).
-   - Desinstalar: `@vue/cli-*`, `@babel/*`, `eslint` (reinstalar versión compatible con ESM si es necesario).
-8. **Actualizar `404.html`**: ajustar `pathSegmentsToKeep` si la estructura de despliegue cambia.
-9. **Verificación**:
-   - `npm run dev` — comprobar HMR, carga de mapa, animación, tema.
-   - `npm run build && npm run preview` — verificar que el build de producción funcione con `base: '/maraton-cali/'`.
-   - Probar en mobile y ambos temas.
-10. **Actualizar este archivo de instructions y el README** con los nuevos scripts, configuración y stack.
+Migración realizada. Stack actual: **Vite 6** + `@vitejs/plugin-vue 5`. Archivos eliminados: `vue.config.js`, `babel.config.js`. Variables de entorno con prefijo `VITE_`, accedidas vía `import.meta.env.*`. Scripts: `npm run dev`, `npm run build`, `npm run preview`.
 
 ### 4.2 Migrar a Composition API (prioridad media)
 

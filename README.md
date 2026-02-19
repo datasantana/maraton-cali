@@ -13,7 +13,7 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 | Framework | **Vue 3** (Options API) + Vue Router 4 |
 | Mapa | **Mapbox GL JS 3.12** |
 | Cálculos geoespaciales | **Turf.js 3** (`turf.along`, `turf.lineDistance`) |
-| Build | **Vue CLI 5** (Webpack 5) |
+| Build | **Vite 6** (Rollup) |
 | CSS | CSS custom properties (design tokens), sin preprocesador |
 | Linting | ESLint + `eslint-plugin-vue` (vue3-essential) |
 | Despliegue | **GitHub Pages** (SPA redirect con `404.html`) |
@@ -101,26 +101,28 @@ El GeoJSON estándar contiene un `LineString` (trayecto) y `Point` features (way
 Copiar `.env.example` → `.env` y configurar:
 
 ```dotenv
-VUE_APP_MAPBOX_ACCESS_TOKEN=tu_token_aquí
-VUE_APP_MAPBOX_STYLE=mapbox://styles/mapbox/standard
-VUE_APP_MAPBOX_CENTER_LNG=-76.5410942407
-VUE_APP_MAPBOX_CENTER_LAT=3.4300127118
+VITE_MAPBOX_ACCESS_TOKEN=tu_token_aquí
+VITE_MAPBOX_STYLE=mapbox://styles/mapbox/standard
+VITE_MAPBOX_CENTER_LNG=-76.5410942407
+VITE_MAPBOX_CENTER_LAT=3.4300127118
 ```
 
 ### Instalación y desarrollo
 
 ```bash
 npm install        # Instalar dependencias
-npm run serve      # Dev server con hot-reload
+npm run dev        # Dev server con hot-reload (Vite)
 npm run build      # Build de producción (output en dist/)
-npm run lint       # Lint y auto-fix
+npm run preview    # Preview del build de producción
+npm run lint       # Lint
 ```
 
-### Webpack personalizado (`vue.config.js`)
+### Configuración de Vite (`vite.config.js`)
 
-- `publicPath` → `/maraton-cali/` en producción (GitHub Pages).
-- `.csv` importados como texto raw (`asset/source`).
-- `.geojson` importados como JSON.
+- `base` → `/maraton-cali/` en producción (GitHub Pages).
+- Alias `@` → `src/`.
+- `.csv` importados con sufijo `?raw` para texto plano.
+- `.geojson` transformados a módulos JSON vía plugin custom.
 
 ---
 

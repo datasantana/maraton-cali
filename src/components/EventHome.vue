@@ -104,10 +104,10 @@ export default {
       eventName: eventData.eventName || 'Event',
       eventDate: eventData.eventDate || '2026-01-01',
       routes: eventData.routes,
-      mapboxToken: process.env.VUE_APP_MAPBOX_ACCESS_TOKEN || '',
+      mapboxToken: import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '',
       mapboxStyle: 'mapbox://styles/mapbox/streets-v11',
-      mapCenterLng: process.env.VUE_APP_MAPBOX_CENTER_LNG || '-76.5410942407',
-      mapCenterLat: process.env.VUE_APP_MAPBOX_CENTER_LAT || '3.4300127118'
+      mapCenterLng: import.meta.env.VITE_MAPBOX_CENTER_LNG || '-76.5410942407',
+      mapCenterLat: import.meta.env.VITE_MAPBOX_CENTER_LAT || '3.4300127118'
     }
   },
   computed: {

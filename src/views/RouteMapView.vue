@@ -123,8 +123,8 @@ export default {
         if (config.legacy) {
           // Legacy route: separate path + marks JSON files in routes/ and marks/
           const [pathModule, marksModule] = await Promise.all([
-            import(/* webpackChunkName: "route-[request]" */ `@/assets/routes/${routeId}.json`),
-            import(/* webpackChunkName: "marks-[request]" */ `@/assets/marks/${routeId}.json`),
+            import(`@/assets/routes/${routeId}.json`),
+            import(`@/assets/marks/${routeId}.json`),
           ]);
           this.pathData = pathModule.default || pathModule;
           this.marksData = marksModule.default || marksModule;
@@ -133,8 +133,8 @@ export default {
         } else {
           // Standard route: GeoJSON + elevation CSV
           const [geojsonModule, csvModule] = await Promise.all([
-            import(/* webpackChunkName: "route-[request]" */ `@/assets/routes/${routeId}.geojson`),
-            import(/* webpackChunkName: "elev-[request]" */ `@/assets/elevation/${routeId}.csv`),
+            import(`@/assets/routes/${routeId}.geojson`),
+            import(`@/assets/elevation/${routeId}.csv?raw`),
           ]);
 
           const geojson = geojsonModule.default || geojsonModule;

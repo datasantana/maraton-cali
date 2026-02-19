@@ -92,13 +92,13 @@ export default {
   methods: {
     initMap() {
       // Mapbox configuration from environment variables
-      mapboxgl.accessToken = process.env.VUE_APP_MAPBOX_ACCESS_TOKEN || '';
+      mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
       this.map = new mapboxgl.Map({
         container: this.$refs.mapContainer,
-        style: process.env.VUE_APP_MAPBOX_STYLE || 'mapbox://styles/mapbox/standard',
+        style: import.meta.env.VITE_MAPBOX_STYLE || 'mapbox://styles/mapbox/standard',
         center: [
-          parseFloat(process.env.VUE_APP_MAPBOX_CENTER_LNG) || -76.5410942407,
-          parseFloat(process.env.VUE_APP_MAPBOX_CENTER_LAT) || 3.4300127118,
+          parseFloat(import.meta.env.VITE_MAPBOX_CENTER_LNG) || -76.5410942407,
+          parseFloat(import.meta.env.VITE_MAPBOX_CENTER_LAT) || 3.4300127118,
         ],
         zoom: 12,
         pitch: 0,
