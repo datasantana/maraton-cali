@@ -32,12 +32,12 @@ jobs:
         
       - name: Create environment file
         run: |
-          echo "VUE_APP_MAPBOX_ACCESS_TOKEN=${{ secrets.VUE_APP_MAPBOX_ACCESS_TOKEN }}" >> .env
-          echo "VUE_APP_MAPBOX_STYLE=${{ secrets.VUE_APP_MAPBOX_STYLE }}" >> .env
-          echo "VUE_APP_MAPBOX_CENTER_LNG=${{ secrets.VUE_APP_MAPBOX_CENTER_LNG }}" >> .env
-          echo "VUE_APP_MAPBOX_CENTER_LAT=${{ secrets.VUE_APP_MAPBOX_CENTER_LAT }}" >> .env
-          echo "VUE_APP_MAPBOX_ZOOM=${{ secrets.VUE_APP_MAPBOX_ZOOM }}" >> .env
-          echo "VUE_APP_MAPBOX_PITCH=${{ secrets.VUE_APP_MAPBOX_PITCH }}" >> .env
+          echo "VITE_MAPBOX_ACCESS_TOKEN=${{ secrets.VUE_APP_MAPBOX_ACCESS_TOKEN }}" >> .env
+          echo "VITE_MAPBOX_STYLE=${{ secrets.VUE_APP_MAPBOX_STYLE }}" >> .env
+          echo "VITE_MAPBOX_CENTER_LNG=${{ secrets.VUE_APP_MAPBOX_CENTER_LNG }}" >> .env
+          echo "VITE_MAPBOX_CENTER_LAT=${{ secrets.VUE_APP_MAPBOX_CENTER_LAT }}" >> .env
+          echo "VITE_MAPBOX_ZOOM=${{ secrets.VUE_APP_MAPBOX_ZOOM }}" >> .env
+          echo "VITE_MAPBOX_PITCH=${{ secrets.VUE_APP_MAPBOX_PITCH }}" >> .env
         
       - name: Build
         run: npm run build
