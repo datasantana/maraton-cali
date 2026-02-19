@@ -46,9 +46,10 @@ src/
 ├── theme/
 │   ├── index.js             # Barrel export (useTheme + tokens)
 │   ├── tokens.js            # Tokens de diseño centralizados (colores, tipografía, layout)
+│   ├── tokensToCSS.js       # Generador: tokens.js → CSS custom properties
 │   ├── useTheme.js          # Composable — toggle dark/light, localStorage, cross-tab sync
 │   ├── themeMixin.js        # (Legacy, ya no se importa — conservado como referencia)
-│   └── variables.css        # Custom properties CSS generadas desde tokens
+│   └── variables.css        # Shell — contenido generado por cssTokensPlugin desde tokens.js
 │
 ├── utils/
 │   └── parseElevationCsv.js # Parser CSV → array de objetos con tipos numéricos
@@ -84,7 +85,8 @@ event.json ──▶ EventHome (tarjetas) ──▶ router-link /route/:id
 - Retorna `{ isLightTheme, toggleTheme }` — ref reactiva y función de toggle.
 - Agrega/quita la clase `.light-theme` en `<html>`, con persistencia en localStorage y sincronización cross-tab.
 - Las variables CSS en `variables.css` (`:root` = dark, `.light-theme` = light) se aplican globalmente.
-- `tokens.js` define los valores fuente; `variables.css` los mapea a custom properties.
+- `tokens.js` es la única fuente de verdad; `tokensToCSS.js` genera las custom properties automáticamente en build/dev time.
+- El Vite plugin `cssTokensPlugin` intercepta la carga de `variables.css` y la reemplaza con el CSS generado.
 
 ### Datos de rutas
 
@@ -128,6 +130,7 @@ npm run lint       # Lint
 - Alias `@` → `src/`.
 - `.csv` importados con sufijo `?raw` para texto plano.
 - `.geojson` transformados a módulos JSON vía plugin custom.
+- **`cssTokensPlugin`** intercepta `variables.css` y genera CSS custom properties desde `tokens.js` vía `tokensToCSS.js`.
 
 ---
 
