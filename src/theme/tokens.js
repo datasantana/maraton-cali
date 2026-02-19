@@ -60,6 +60,7 @@ const tokens = {
       speedBtnBg: 'rgba(0, 0, 0, 0.05)',
       speedBtnBorder: 'rgba(0, 0, 0, 0.15)',
       speedBtnHoverBg: 'rgba(0, 0, 0, 0.1)',
+      accentDark: '#00c853',           // overrides brand accentDark for readability
     },
 
     /* ── Difficulty badges ───────────────────────────────────── */
@@ -111,6 +112,11 @@ const tokens = {
     borderRadiusCard: '12px',
     borderRadiusBadge: '20px',
     borderRadiusBtn: '8px',
+  },
+
+  /* ── Transitions ────────────────────────────────────────────── */
+  transitions: {
+    theme: 'background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease',
   },
 };
 
