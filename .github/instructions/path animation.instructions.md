@@ -20,15 +20,26 @@ src/
   router/         → Definición de rutas de Vue Router
 ```
 
-### 2.2 Estilo de componentes
+### 2.2 Estructura de composables
 
-- **API**: Options API (no Composition API). Todos los componentes usan `export default { name, props, data, computed, methods, watch, ... }`.
-- **Nomenclatura de archivos**: PascalCase para componentes (`.vue`), camelCase para utilidades (`.js`).
-- **Nomenclatura de componentes**: la propiedad `name` debe coincidir con el nombre del archivo.
-- **Props**: siempre tipadas con `type`, `default` y JSDoc cuando el propósito no es obvio.
-- **Emits**: declarar en el array `emits` del componente.
+```
+src/
+  composables/              → Composables de dominio (lógica reutilizable)
+    useRouteAnimation.js    → Animación del mapa (capas, frame loop, controles)
+  theme/
+    useTheme.js             → Toggle dark/light, localStorage, cross-tab sync
+```
+
+### 2.3 Estilo de componentes
+
+- **API**: Composition API con `<script setup>`. Todos los componentes usan `defineProps`, `defineEmits`, `ref`, `computed`, `watch`, `onMounted`, etc.
+- **Nomenclatura de archivos**: PascalCase para componentes (`.vue`), camelCase para utilidades y composables (`.js`).
+- **Nomenclatura de componentes**: inferida automáticamente del nombre de archivo por Vue 3 `<script setup>`.
+- **Props**: declaradas con `defineProps({ ... })`, siempre tipadas con `type`, `default` y JSDoc cuando el propósito no es obvio.
+- **Emits**: declarados con `defineEmits([...])` en `<script setup>`.
 - **CSS**: `<style scoped>` en cada componente. Usar variables CSS globales (`var(--xxx)`), nunca colores/tamaños hardcodeados.
 - **BEM en CSS**: los componentes nuevos deben seguir BEM (`bloque__elemento--modificador`). Ejemplo: `RaceTitle.vue` ya lo usa (`.race-title__badge--easy`).
+- **Composables**: lógica reutilizable se extrae a funciones `use*()` en `src/composables/` o `src/theme/`.
 
 ### 2.3 Sistema de temas
 
@@ -36,8 +47,11 @@ src/
 - **Variables CSS**: `src/theme/variables.css` mapea tokens a custom properties.  
   - `:root` = modo oscuro (default).
   - `.light-theme` = modo claro.
-- **Mixin**: `src/theme/themeMixin.js` provee `isLightTheme` y `toggleTheme()`.  
-  Se importa vía `import { themeMixin } from '@/theme'`.
+- **Composable**: `src/theme/useTheme.js` provee `isLightTheme` (ref) y `toggleTheme()`.  
+  Se importa vía `import { useTheme } from '@/theme'` y se usa así:
+  ```js
+  const { isLightTheme, toggleTheme } = useTheme();
+  ```
 - **Regla**: todo color, radio y fuente debe referenciarse como `var(--token)` en CSS. Para uso en JS (ej. Mapbox paint), importar `tokens` directamente.
 
 ### 2.4 Datos y assets
@@ -78,13 +92,14 @@ Prefijo `VITE_` (requisito Vite). Definidas en `.env`:
 
 ### 3.2 Animación del mapa
 
-La animación en `RouteMap.vue` se gestiona mediante closures dentro de `setupAnimation()`:
+La animación se encapsula en el composable `useRouteAnimation(props, emit)` en `src/composables/useRouteAnimation.js`:
 
+- Retorna `{ setup }` — función que recibe la instancia de `mapboxgl.Map` una vez cargada.
 - `frame()` — loop de `requestAnimationFrame` que calcula la fase de animación.
 - `updateDisplay(phase, moveCamera)` — actualiza posición del marcador, gradiente de la línea y cámara.
-- `_togglePause(playing)`, `_seekToPhase(targetPhase)`, `_setSpeed(newSpeed)` — funciones expuestas al watcher de props para controlar la animación desde el exterior.
+- `_togglePause(playing)`, `_seekToPhase(targetPhase)`, `_setSpeed(newSpeed)` — closures internas conectadas a watchers de props.
 
-**Importante**: estas closures capturan variables locales (`startTime`, `isPaused`, `speed`, etc.) para evitar reactividad innecesaria de Vue.
+**Importante**: estas closures capturan variables locales (`startTime`, `isPaused`, `speed`, etc.) para evitar reactividad innecesaria de Vue. Los watchers en el composable referencian las closures mediante variables mutables del scope de `useRouteAnimation`.
 
 ### 3.3 Perfil de elevación
 
@@ -100,14 +115,17 @@ La animación en `RouteMap.vue` se gestiona mediante closures dentro de `setupAn
 
 Migración realizada. Stack actual: **Vite 6** + `@vitejs/plugin-vue 5`. Archivos eliminados: `vue.config.js`, `babel.config.js`. Variables de entorno con prefijo `VITE_`, accedidas vía `import.meta.env.*`. Scripts: `npm run dev`, `npm run build`, `npm run preview`.
 
-### 4.2 Migrar a Composition API (prioridad media)
+### 4.2 Migrar a Composition API — ✅ COMPLETADO
 
-Los componentes usan Options API con `mixins`, lo cual dificulta la tipificación y el testing:
+Migración realizada. Todos los componentes usan `<script setup>` (Composition API):
 
-1. Convertir `themeMixin.js` → `useTheme.js` (composable con `ref`, `watch`, `onMounted`).
-2. Migrar componentes uno a uno: `RaceTitle` → `PlayBack` → `EventHome` → `RouteMap` → `RouteMapView`.
-3. Reemplazar `mixins: [themeMixin]` por `const { isLightTheme, toggleTheme } = useTheme()` en `<script setup>` o en `setup()`.
-4. En `RouteMap.vue`, trasladar los closures de animación a un composable `useRouteAnimation(map, props, emit)` que encapsule `frame`, `updateDisplay`, `seekToPhase`, etc.
+1. ✅ `themeMixin.js` → `useTheme.js` (composable con `ref`, `watch`, `onMounted`).
+2. ✅ Componentes migrados: `App` → `RaceTitle` → `PlayBack` → `EventHome` → `RouteMap` → `RouteMapView` → `HomeView` → `AboutView`.
+3. ✅ `mixins: [themeMixin]` reemplazado por `const { isLightTheme, toggleTheme } = useTheme()` en componentes que lo necesitan (`App.vue`, `EventHome.vue`).
+4. ✅ Closures de animación extraídos a `src/composables/useRouteAnimation.js` — composable `useRouteAnimation(props, emit)` que retorna `{ setup(map) }`.
+
+Archivos nuevos: `src/theme/useTheme.js`, `src/composables/useRouteAnimation.js`.  
+Archivo legacy conservado: `src/theme/themeMixin.js` (ya no se importa).
 
 ### 4.3 Eliminar duplicación de tokens (prioridad alta)
 

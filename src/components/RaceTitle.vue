@@ -9,69 +9,61 @@
   </div>
 </template>
 
-<script>
-import { themeMixin } from '@/theme';
+<script setup>
+import { computed } from 'vue';
 
-export default {
-  name: 'RaceTitle',
-  mixins: [themeMixin],
-  props: {
-    /** Route display name, e.g. "21K" */
-    name: {
-      type: String,
-      default: '',
-    },
-    /** Race type label, e.g. "Half Marathon", "Marathon" */
-    type: {
-      type: String,
-      default: '',
-    },
-    /** City name, e.g. "Madrid" */
-    city: {
-      type: String,
-      default: '',
-    },
-    /** Total distance in km, e.g. 21.097 */
-    distance: {
-      type: Number,
-      default: 0,
-    },
-    /** Distance unit, e.g. "km" */
-    distanceUnit: {
-      type: String,
-      default: 'km',
-    },
-    /** Route difficulty: "easy" | "moderate" | "challenging" */
-    difficulty: {
-      type: String,
-      default: 'moderate',
-    },
-    /** Short description, e.g. "Castellana to Madrid Río" */
-    description: {
-      type: String,
-      default: '',
-    },
+const props = defineProps({
+  /** Route display name, e.g. "21K" */
+  name: {
+    type: String,
+    default: '',
   },
-  data() {
-    return {};
+  /** Race type label, e.g. "Half Marathon", "Marathon" */
+  type: {
+    type: String,
+    default: '',
   },
-  computed: {
-    /** Format total distance with locale separators, e.g. "21,097m" or "15km" */
-    formattedTotalDistance() {
-      if (!this.distance) return '';
-      // Show metres when there are meaningful decimals, otherwise km
-      const isWholeKm = this.distance === Math.floor(this.distance);
-      if (isWholeKm) {
-        return `${this.distance.toLocaleString()}${this.distanceUnit}`;
-      }
-      const metres = Math.round(this.distance * 1000);
-      return `${metres.toLocaleString()}m`;
-    },
-    difficultyClass() {
-      return `race-title__badge--${this.difficulty}`;
-    },
+  /** City name, e.g. "Madrid" */
+  city: {
+    type: String,
+    default: '',
   },
-};
+  /** Total distance in km, e.g. 21.097 */
+  distance: {
+    type: Number,
+    default: 0,
+  },
+  /** Distance unit, e.g. "km" */
+  distanceUnit: {
+    type: String,
+    default: 'km',
+  },
+  /** Route difficulty: "easy" | "moderate" | "challenging" */
+  difficulty: {
+    type: String,
+    default: 'moderate',
+  },
+  /** Short description, e.g. "Castellana to Madrid Río" */
+  description: {
+    type: String,
+    default: '',
+  },
+});
+
+/** Format total distance with locale separators, e.g. "21,097m" or "15km" */
+const formattedTotalDistance = computed(() => {
+  if (!props.distance) return '';
+  const isWholeKm = props.distance === Math.floor(props.distance);
+  if (isWholeKm) {
+    return `${props.distance.toLocaleString()}${props.distanceUnit}`;
+  }
+  const metres = Math.round(props.distance * 1000);
+  return `${metres.toLocaleString()}m`;
+});
+
+const difficultyClass = computed(() => {
+  return `race-title__badge--${props.difficulty}`;
+});
 </script>
 
 <style scoped>
