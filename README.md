@@ -41,7 +41,8 @@ src/
 │   ├── EventHome.vue        # Landing: hero, grid de tarjetas de ruta, header, footer
 │   ├── RouteMap.vue         # Mapa Mapbox con animación vía useRouteAnimation composable
 │   ├── PlayBack.vue         # Barra de reproducción: play/pause, velocidad, scrub, stats
-│   └── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
+│   ├── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
+│   └── icons/               # Componentes SVG icon reutilizables (IconPlay, IconPause, etc.)
 │
 ├── theme/
 │   ├── index.js             # Barrel export (useTheme + tokens)

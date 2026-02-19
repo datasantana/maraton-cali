@@ -69,9 +69,9 @@ const difficultyClass = computed(() => {
 <style scoped>
 .race-title {
   position: absolute;
-  top: 24px;
-  left: 24px;
-  z-index: 1000;
+  top: var(--spacing-overlay-bottom);
+  left: var(--spacing-overlay-bottom);
+  z-index: var(--z-overlay);
   padding: 16px 20px;
   background: var(--color-bg-glass);
   backdrop-filter: blur(16px);

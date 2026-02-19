@@ -141,21 +141,28 @@ Archivos nuevos: `src/theme/tokensToCSS.js`.
 Archivos modificados: `tokens.js`, `variables.css`, `vite.config.js`.  
 **Nota**: cambios en `tokens.js` requieren reiniciar el dev server.
 
-### 4.4 Homogeneizar CSS (prioridad alta)
+### 4.4 Homogeneizar CSS (prioridad alta) — ✅ COMPLETADO
 
-- **BEM**: `RaceTitle.vue` usa BEM; `PlayBack.vue`, `EventHome.vue` y `RouteMap.vue` no.
-  - Renombrar clases en `PlayBack.vue`: `playback-bar` → `playback`, botones → `playback__play-btn`, `playback__speed-btn`, stats → `playback__stat`, etc.
-  - Renombrar clases en `EventHome.vue`: `.header` → `.event-home__header`, `.hero` → `.event-home__hero`, `.route-card` → `.event-home__card`, etc.
-- **Scoped styles**: verificar que todos los componentes usen `<style scoped>`. `RouteMap.vue` ya lo tiene.
-- **Evitar magic numbers**: extraer a custom properties o constantes de tokens valores como `padding: 24px`, `z-index: 1000`, `width: 120px`, etc.
+Homogeneización realizada:
 
-### 4.5 Extraer SVG inline a componentes icon (prioridad baja)
+1. ✅ `PlayBack.vue` migrado a BEM: `.playback-bar` → `.playback`, `.play-pause-btn` → `.playback__play-btn`, `.speed-btn` → `.playback__speed-btn`, `.stats-group` → `.playback__stats`, `.stat` → `.playback__stat`, etc.
+2. ✅ `EventHome.vue` migrado a BEM: `.header` → `.event-home__header`, `.hero` → `.event-home__hero`, `.route-card` → `.event-home__card`, `.badge` → `.event-home__badge`, `.footer` → `.event-home__footer`, etc.
+3. ✅ Todos los componentes verificados con `<style scoped>`.
+4. ✅ Magic numbers extraídos a tokens: `z-index: 1000` → `var(--z-overlay)`, `z-index: 100` → `var(--z-header)`, `bottom: 24px` / `top: 24px` / `left: 24px` → `var(--spacing-overlay-bottom)`. Hardcoded colors en `RouteMapView.vue` reemplazados por variables CSS.
 
-`EventHome.vue` y `PlayBack.vue` contienen SVG inline repetidos (calendar, play, pause, map, sun/moon):
+Tokens añadidos a `tokens.js`: `layout.zIndexOverlay`, `layout.zIndexHeader`, `layout.spacingOverlayBottom`.  
+Archivos modificados: `PlayBack.vue`, `EventHome.vue`, `RaceTitle.vue`, `RouteMapView.vue`, `tokens.js`, `tokensToCSS.js`.
 
-1. Crear carpeta `src/components/icons/` con componentes de icono (`IconPlay.vue`, `IconPause.vue`, `IconCalendar.vue`, etc.).
-2. Cada componente acepta props `size` y `color` (default `currentColor`).
-3. Reemplazar el SVG inline por `<IconPlay />`.
+### 4.5 Extraer SVG inline a componentes icon (prioridad baja) — ✅ COMPLETADO
+
+Extracción realizada:
+
+1. ✅ Creada carpeta `src/components/icons/` con 6 componentes: `IconPlay.vue`, `IconPause.vue`, `IconMoon.vue`, `IconSun.vue`, `IconCalendar.vue`, `IconMap.vue`.
+2. ✅ Cada componente acepta props `size` (default 24) y `color` (default `currentColor`).
+3. ✅ SVG inline reemplazados en `PlayBack.vue` (play/pause) y `EventHome.vue` (moon/sun, calendar, map).
+
+Archivos nuevos: `src/components/icons/Icon{Play,Pause,Moon,Sun,Calendar,Map}.vue`.  
+Archivos modificados: `PlayBack.vue`, `EventHome.vue`.
 
 ### 4.6 Centralizar la configuración de Mapbox (prioridad media)
 
