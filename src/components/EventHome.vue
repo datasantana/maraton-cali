@@ -1,67 +1,56 @@
 <template>
   <div class="event-home">
     <!-- Header -->
-    <header class="header">
-      <div class="header-content">
-        <div class="logo">
-          <img class="logo-icon" :src="logoSrc" :alt="eventName" />
-          <!--span class="logo-text">{{ eventName }}</span-->
+    <header class="event-home__header">
+      <div class="event-home__header-content">
+        <div class="event-home__logo">
+          <img class="event-home__logo-icon" :src="logoSrc" :alt="eventName" />
         </div>
-        
-        <nav class="nav">
-          <a @click.prevent="scrollTo('routes')" class="nav-link">Routes</a>
-          <a @click.prevent="scrollTo('schedule')" class="nav-link">Schedule</a>
-          <a @click.prevent="scrollTo('faq')" class="nav-link">FAQ</a>
-          <a @click.prevent="scrollTo('contact')" class="nav-link">Contact</a>
+
+        <nav class="event-home__nav">
+          <a @click.prevent="scrollTo('routes')" class="event-home__nav-link">Routes</a>
+          <a @click.prevent="scrollTo('schedule')" class="event-home__nav-link">Schedule</a>
+          <a @click.prevent="scrollTo('faq')" class="event-home__nav-link">FAQ</a>
+          <a @click.prevent="scrollTo('contact')" class="event-home__nav-link">Contact</a>
         </nav>
-        
-        <div class="header-actions">
-          <button class="theme-toggle" @click="toggleTheme" :aria-label="isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'">
-            <svg v-if="!isLightTheme" class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <svg v-else class="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
+
+        <div class="event-home__actions">
+          <button class="event-home__theme-toggle" @click="toggleTheme" :aria-label="isLightTheme ? 'Switch to dark mode' : 'Switch to light mode'">
+            <IconMoon v-if="!isLightTheme" :size="24" class="event-home__icon" />
+            <IconSun v-else :size="24" class="event-home__icon" />
           </button>
-          <button class="register-btn">Register Now</button>
+          <button class="event-home__register-btn">Register Now</button>
         </div>
       </div>
     </header>
 
     <!-- Hero Section -->
-    <section class="hero">
-      <h1 class="hero-title">{{ city }}</h1>
-      <div class="hero-date">
-        <svg class="calendar-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" stroke-width="2"/>
-          <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+    <section class="event-home__hero">
+      <h1 class="event-home__hero-title">{{ city }}</h1>
+      <div class="event-home__hero-date">
+        <IconCalendar :size="20" />
         <span>{{ formattedDate }}</span>
       </div>
     </section>
 
     <!-- Routes Section -->
-    <section id="routes" class="routes-section">
-      <div class="routes-grid">
-        <div class="route-card" v-for="route in routes" :key="route.id">
-          <div class="card-image">
+    <section id="routes" class="event-home__routes">
+      <div class="event-home__routes-grid">
+        <div class="event-home__card" v-for="route in routes" :key="route.id">
+          <div class="event-home__card-image">
             <img :src="getStaticMapUrl(route)" :alt="route.name + ' Route Map'" />
           </div>
-          <div class="card-content">
-            <div class="card-header">
-              <h2 class="card-title">{{ route.name }}</h2>
-              <span :class="['badge', 'badge-' + route.difficulty]">{{ capitalizeFirst(route.difficulty) }}</span>
+          <div class="event-home__card-content">
+            <div class="event-home__card-header">
+              <h2 class="event-home__card-title">{{ route.name }}</h2>
+              <span :class="['event-home__badge', 'event-home__badge--' + route.difficulty]">{{ capitalizeFirst(route.difficulty) }}</span>
             </div>
-            <p class="card-subtitle">{{ route.type.toUpperCase() }}</p>
-            <p class="card-description">
+            <p class="event-home__card-subtitle">{{ route.type.toUpperCase() }}</p>
+            <p class="event-home__card-description">
               {{ route.description }}
             </p>
-            <router-link :to="'/route/' + route.id" class="card-btn">
-              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+            <router-link :to="'/route/' + route.id" class="event-home__card-btn">
+              <IconMap :size="18" />
               View route details
             </router-link>
           </div>
@@ -70,18 +59,18 @@
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
-      <div class="footer-content">
-        <div class="footer-logo">
-          <img class="logo-icon" :src="iconSrc" :alt="eventName" />
+    <footer class="event-home__footer">
+      <div class="event-home__footer-content">
+        <div class="event-home__footer-logo">
+          <img class="event-home__logo-icon event-home__logo-icon--small" :src="iconSrc" :alt="eventName" />
           <span>{{ eventName }}</span>
         </div>
-        <div class="footer-links">
+        <div class="event-home__footer-links">
           <a @click.prevent="scrollTo('privacy')">Privacy Policy</a>
           <a @click.prevent="scrollTo('terms')">Terms of Service</a>
           <a @click.prevent="scrollTo('contact')">Contact</a>
         </div>
-        <p class="footer-copyright">© {{ eventYear }} {{ eventName }}. All rights reserved.</p>
+        <p class="event-home__footer-copyright">© {{ eventYear }} {{ eventName }}. All rights reserved.</p>
       </div>
     </footer>
   </div>
@@ -93,6 +82,10 @@ import eventData from '../assets/event.json';
 import { useTheme } from '@/theme';
 import logoImage from '@/assets/event-logo.png';
 import iconImage from '@/assets/event-icon.png';
+import IconMoon from '@/components/icons/IconMoon.vue';
+import IconSun from '@/components/icons/IconSun.vue';
+import IconCalendar from '@/components/icons/IconCalendar.vue';
+import IconMap from '@/components/icons/IconMap.vue';
 
 const { isLightTheme, toggleTheme } = useTheme();
 
@@ -155,18 +148,18 @@ function scrollTo(id) {
   transition: var(--transition-theme);
 }
 
-/* Header */
-.header {
+/* ── Header ─────────────────────────────────────────────────── */
+.event-home__header {
   border-bottom: 1px solid var(--color-border);
   padding: 1rem 2rem;
   position: sticky;
   top: 0;
   background-color: var(--color-bg);
-  z-index: 100;
+  z-index: var(--z-header);
   transition: var(--transition-theme);
 }
 
-.header-content {
+.event-home__header-content {
   max-width: var(--max-width);
   margin: 0 auto;
   display: flex;
@@ -174,29 +167,29 @@ function scrollTo(id) {
   justify-content: space-between;
 }
 
-.logo {
+.event-home__logo {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.logo-icon {
+.event-home__logo-icon {
   width: 120px;
   height: 40px;
   object-fit: contain;
 }
 
-.logo-text {
-  font-weight: 600;
-  font-size: 1.1rem;
+.event-home__logo-icon--small {
+  width: 32px;
+  height: 32px;
 }
 
-.nav {
+.event-home__nav {
   display: flex;
   gap: 2rem;
 }
 
-.nav-link {
+.event-home__nav-link {
   color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.95rem;
@@ -204,17 +197,17 @@ function scrollTo(id) {
   cursor: pointer;
 }
 
-.nav-link:hover {
+.event-home__nav-link:hover {
   color: var(--color-text);
 }
 
-.header-actions {
+.event-home__actions {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.theme-toggle {
+.event-home__theme-toggle {
   background: transparent;
   border: none;
   cursor: pointer;
@@ -224,46 +217,44 @@ function scrollTo(id) {
   justify-content: center;
 }
 
-.theme-toggle .icon {
-  width: 24px;
-  height: 24px;
+.event-home__icon {
   color: var(--color-text-muted);
   transition: color 0.2s ease;
 }
 
-.theme-toggle:hover .icon {
+.event-home__theme-toggle:hover .event-home__icon {
   color: var(--color-text);
 }
 
-.register-btn {
+.event-home__register-btn {
   background-color: var(--color-primary);
   color: #000;
   border: none;
   padding: 0.6rem 1.2rem;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.register-btn:hover {
+.event-home__register-btn:hover {
   background-color: var(--color-primary-hover);
 }
 
-/* Hero Section */
-.hero {
+/* ── Hero ───────────────────────────────────────────────────── */
+.event-home__hero {
   text-align: center;
   padding: 4rem 2rem;
 }
 
-.hero-title {
+.event-home__hero-title {
   font-size: 6rem;
   font-weight: 800;
   margin: 0 0 1rem;
   letter-spacing: -2px;
 }
 
-.hero-date {
+.event-home__hero-date {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,19 +263,14 @@ function scrollTo(id) {
   font-size: 1.1rem;
 }
 
-.calendar-icon {
-  width: 20px;
-  height: 20px;
-}
-
-/* Routes Section */
-.routes-section {
+/* ── Routes Section ─────────────────────────────────────────── */
+.event-home__routes {
   padding: 2rem;
   max-width: var(--max-width);
   margin: 0 auto;
 }
 
-.routes-grid {
+.event-home__routes-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 2rem;
@@ -292,57 +278,31 @@ function scrollTo(id) {
   align-items: stretch;
 }
 
-.route-card {
+/* ── Route Card ─────────────────────────────────────────────── */
+.event-home__card {
   flex: 1 1 calc(33.333% - 1.5rem);
   min-width: 280px;
   max-width: 420px;
   display: flex;
   flex-direction: column;
-}
-
-@media (max-width: 1024px) {
-  .route-card {
-    flex: 1 1 calc(50% - 1rem);
-  }
-}
-
-@media (max-width: 768px) {
-  .route-card {
-    flex: 1 1 100%;
-    max-width: 100%;
-  }
-  
-  .nav {
-    display: none;
-  }
-  
-  .hero-title {
-    font-size: 4rem;
-  }
-}
-
-/* Route Card */
-.route-card {
   background-color: var(--color-bg-elevated);
   border-radius: var(--radius-card);
   overflow: hidden;
   transition: transform 0.2s ease, background-color 0.3s ease;
-  display: flex;
-  flex-direction: column;
 }
 
-.route-card:hover {
+.event-home__card:hover {
   transform: translateY(-4px);
 }
 
-.card-image {
+.event-home__card-image {
   width: 100%;
   height: 180px;
   overflow: hidden;
   flex-shrink: 0;
 }
 
-.card-image img {
+.event-home__card-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -350,56 +310,56 @@ function scrollTo(id) {
   transition: filter 0.3s ease;
 }
 
-.route-card:hover .card-image img {
+.event-home__card:hover .event-home__card-image img {
   filter: grayscale(50%);
 }
 
-.card-content {
+.event-home__card-content {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
   flex-grow: 1;
 }
 
-.card-header {
+.event-home__card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.25rem;
 }
 
-.card-title {
+.event-home__card-title {
   font-size: 2rem;
   font-weight: 700;
   margin: 0;
 }
 
-.badge {
+.event-home__badge {
   padding: 0.25rem 0.75rem;
-  border-radius: 20px;
+  border-radius: var(--radius-badge);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
-.badge-easy {
+.event-home__badge--easy {
   background: var(--color-diff-easy-bg);
   color: var(--color-diff-easy-text);
   border: none;
 }
 
-.badge-moderate {
+.event-home__badge--moderate {
   background: var(--color-diff-moderate-bg);
   color: var(--color-diff-moderate-text);
   border: none;
 }
 
-.badge-challenging {
+.event-home__badge--challenging {
   background: var(--color-diff-challenging-bg);
   color: var(--color-diff-challenging-text);
   border: none;
 }
 
-.card-subtitle {
+.event-home__card-subtitle {
   color: var(--color-primary);
   font-size: 0.75rem;
   font-weight: 600;
@@ -407,7 +367,7 @@ function scrollTo(id) {
   margin: 0 0 1rem;
 }
 
-.card-description {
+.event-home__card-description {
   color: var(--color-text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
@@ -415,7 +375,7 @@ function scrollTo(id) {
   flex-grow: 1;
 }
 
-.card-btn {
+.event-home__card-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -434,31 +394,26 @@ function scrollTo(id) {
   box-sizing: border-box;
 }
 
-.card-btn:hover {
+.event-home__card-btn:hover {
   background-color: var(--color-card-hover-bg);
   border-color: var(--color-text-muted);
 }
 
-.btn-icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* Footer */
-.footer {
+/* ── Footer ─────────────────────────────────────────────────── */
+.event-home__footer {
   border-top: 1px solid var(--color-border);
   padding: 3rem 2rem;
   margin-top: 4rem;
   transition: border-color 0.3s ease;
 }
 
-.footer-content {
+.event-home__footer-content {
   max-width: var(--max-width);
   margin: 0 auto;
   text-align: center;
 }
 
-.footer-logo {
+.event-home__footer-logo {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -467,19 +422,14 @@ function scrollTo(id) {
   font-weight: 600;
 }
 
-.footer-logo .logo-icon {
-  width: 32px;
-  height: 32px;
-}
-
-.footer-links {
+.event-home__footer-links {
   display: flex;
   justify-content: center;
   gap: 2rem;
   margin-bottom: 1.5rem;
 }
 
-.footer-links a {
+.event-home__footer-links a {
   color: var(--color-text-muted);
   text-decoration: none;
   font-size: 0.9rem;
@@ -487,13 +437,35 @@ function scrollTo(id) {
   cursor: pointer;
 }
 
-.footer-links a:hover {
+.event-home__footer-links a:hover {
   color: var(--color-text);
 }
 
-.footer-copyright {
+.event-home__footer-copyright {
   color: var(--color-text-faint);
   font-size: 0.85rem;
   margin: 0;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .event-home__card {
+    flex: 1 1 calc(50% - 1rem);
+  }
+}
+
+@media (max-width: 768px) {
+  .event-home__card {
+    flex: 1 1 100%;
+    max-width: 100%;
+  }
+
+  .event-home__nav {
+    display: none;
+  }
+
+  .event-home__hero-title {
+    font-size: 4rem;
+  }
 }
 </style>

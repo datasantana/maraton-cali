@@ -197,7 +197,7 @@ watch(() => route.params.routeId, (routeId) => {
   width: 100%;
   height: 100vh;
   position: relative;
-  background: #0a0a0a;
+  background: var(--color-bg);
 }
 
 /* Ensure the container fills the screen when Mapbox fullscreen control is active */
@@ -212,13 +212,13 @@ watch(() => route.params.routeId, (routeId) => {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-family);
   font-size: 1.2rem;
-  color: #a1a1a1;
-  background: #0a0a0a;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
 }
 
 .error {
-  color: #ff5252;
+  color: var(--color-diff-challenging-text);
 }
 </style>

@@ -89,6 +89,9 @@ export function tokensToCSS(tokens) {
     'radius-card': layout.borderRadiusCard,
     'radius-badge': layout.borderRadiusBadge,
     'radius-btn': layout.borderRadiusBtn,
+    'z-overlay': layout.zIndexOverlay,
+    'z-header': layout.zIndexHeader,
+    'spacing-overlay-bottom': layout.spacingOverlayBottom,
   });
 
   /* Transitions */

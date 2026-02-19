@@ -1,46 +1,39 @@
 <template>
-  <div class="playback-bar">
+  <div class="playback">
     <!-- Play/Pause Button -->
-    <button class="play-pause-btn" @click="togglePlay" :aria-label="isPlaying ? 'Pause' : 'Play'">
-      <!-- Pause icon -->
-      <svg v-if="isPlaying" viewBox="0 0 24 24" fill="currentColor" class="play-icon">
-        <rect x="6" y="4" width="4" height="16" rx="1" />
-        <rect x="14" y="4" width="4" height="16" rx="1" />
-      </svg>
-      <!-- Play icon -->
-      <svg v-else viewBox="0 0 24 24" fill="currentColor" class="play-icon">
-        <path d="M8 5.14v13.72a1 1 0 001.5.86l11.04-6.86a1 1 0 000-1.72L9.5 4.28A1 1 0 008 5.14z" />
-      </svg>
+    <button class="playback__play-btn" @click="togglePlay" :aria-label="isPlaying ? 'Pause' : 'Play'">
+      <IconPause v-if="isPlaying" :size="18" />
+      <IconPlay v-else :size="18" />
     </button>
 
     <!-- Speed Toggle -->
-    <button class="speed-btn" @click="cycleSpeed">
+    <button class="playback__speed-btn" @click="cycleSpeed">
       {{ currentSpeed }}x
     </button>
 
     <!-- Progress Section -->
-    <div class="progress-section">
+    <div class="playback__progress">
       <!-- Stats Left -->
-      <div class="stats-group">
-        <div class="stat">
-          <span class="stat-label">DISTANCE</span>
-          <span class="stat-value">{{ formattedDistance }} <small>km</small></span>
+      <div class="playback__stats">
+        <div class="playback__stat">
+          <span class="playback__stat-label">DISTANCE</span>
+          <span class="playback__stat-value">{{ formattedDistance }} <small>km</small></span>
         </div>
-        <div class="stat">
-          <span class="stat-label">ELEVATION</span>
-          <span class="stat-value">{{ formattedElevation }} <small>m</small></span>
+        <div class="playback__stat">
+          <span class="playback__stat-label">ELEVATION</span>
+          <span class="playback__stat-value">{{ formattedElevation }} <small>m</small></span>
         </div>
       </div>
 
       <!-- Mini Elevation Chart / Progress Bar — click or drag to scrub -->
       <div
-        class="progress-track"
+        class="playback__track"
         ref="progressTrack"
         @mousedown="onScrubStart"
         @touchstart.prevent="onTouchScrubStart"
       >
-        <div class="elevation-line">
-          <svg viewBox="0 0 300 40" preserveAspectRatio="none" class="elevation-svg">
+        <div class="playback__elevation">
+          <svg viewBox="0 0 300 40" preserveAspectRatio="none" class="playback__elevation-svg">
             <polyline
               :points="elevationPoints"
               fill="none"
@@ -57,30 +50,30 @@
             </defs>
           </svg>
           <!-- Progress head indicator -->
-          <div class="progress-head" :style="{ left: progressPercent + '%' }">
-            <div class="head-line"></div>
-            <div class="head-dot"></div>
+          <div class="playback__head" :style="{ left: progressPercent + '%' }">
+            <div class="playback__head-line"></div>
+            <div class="playback__head-dot"></div>
           </div>
         </div>
         <!-- Progress bar beneath elevation -->
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill" :style="{ width: progressPercent + '%' }"></div>
+        <div class="playback__bar-track">
+          <div class="playback__bar-fill" :style="{ width: progressPercent + '%' }"></div>
         </div>
       </div>
 
       <!-- Stats Right -->
-      <div class="stats-group stats-right">
-        <div class="stat">
-          <span class="stat-label">GRADE</span>
-          <span class="stat-value accent">{{ formattedSlope }}</span>
+      <div class="playback__stats playback__stats--right">
+        <div class="playback__stat">
+          <span class="playback__stat-label">GRADE</span>
+          <span class="playback__stat-value playback__stat-value--accent">{{ formattedSlope }}</span>
         </div>
-        <div class="stat">
-          <span class="stat-label">TOTAL ASC.</span>
-          <span class="stat-value">{{ formattedTotalAscent }}<small>m</small></span>
+        <div class="playback__stat">
+          <span class="playback__stat-label">TOTAL ASC.</span>
+          <span class="playback__stat-value">{{ formattedTotalAscent }}<small>m</small></span>
         </div>
-        <div class="stat">
-          <span class="stat-label">TIME</span>
-          <span class="stat-value">{{ formattedTime }}</span>
+        <div class="playback__stat">
+          <span class="playback__stat-label">TIME</span>
+          <span class="playback__stat-value">{{ formattedTime }}</span>
         </div>
       </div>
     </div>
@@ -89,6 +82,8 @@
 
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue';
+import IconPlay from '@/components/icons/IconPlay.vue';
+import IconPause from '@/components/icons/IconPause.vue';
 
 const props = defineProps({
   playing: {
@@ -320,9 +315,9 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.playback-bar {
+.playback {
   position: absolute;
-  bottom: 24px;
+  bottom: var(--spacing-overlay-bottom);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -334,7 +329,7 @@ onBeforeUnmount(() => {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  z-index: 1000;
+  z-index: var(--z-overlay);
   font-family: var(--font-family);
   color: var(--color-text);
   box-shadow: 0 8px 32px var(--color-shadow);
@@ -344,7 +339,7 @@ onBeforeUnmount(() => {
 }
 
 /* Play/Pause Button */
-.play-pause-btn {
+.playback__play-btn {
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -359,22 +354,17 @@ onBeforeUnmount(() => {
   transition: background 0.2s ease, transform 0.15s ease;
 }
 
-.play-pause-btn:hover {
+.playback__play-btn:hover {
   background: var(--color-accent-hover);
   transform: scale(1.08);
 }
 
-.play-pause-btn:active {
+.playback__play-btn:active {
   transform: scale(0.95);
 }
 
-.play-icon {
-  width: 18px;
-  height: 18px;
-}
-
 /* Speed Button */
-.speed-btn {
+.playback__speed-btn {
   min-width: 36px;
   height: 28px;
   border-radius: 6px;
@@ -391,12 +381,12 @@ onBeforeUnmount(() => {
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.speed-btn:hover {
+.playback__speed-btn:hover {
   background: var(--color-speed-btn-hover-bg);
 }
 
 /* Progress Section */
-.progress-section {
+.playback__progress {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -405,24 +395,24 @@ onBeforeUnmount(() => {
 }
 
 /* Stats Groups */
-.stats-group {
+.playback__stats {
   display: flex;
   gap: 16px;
   flex-shrink: 0;
 }
 
-.stat {
+.playback__stat {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 1px;
 }
 
-.stats-right .stat {
+.playback__stats--right .playback__stat {
   align-items: flex-end;
 }
 
-.stat-label {
+.playback__stat-label {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.8px;
@@ -430,26 +420,26 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 
-.stat-value {
+.playback__stat-value {
   font-size: 15px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.stat-value small {
+.playback__stat-value small {
   font-size: 11px;
   font-weight: 500;
   opacity: 0.6;
   margin-left: 2px;
 }
 
-.stat-value.accent {
+.playback__stat-value--accent {
   color: var(--color-accent);
 }
 
 /* Progress Track */
-.progress-track {
+.playback__track {
   flex: 1;
   min-width: 120px;
   display: flex;
@@ -458,17 +448,17 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-.elevation-line {
+.playback__elevation {
   position: relative;
   height: 36px;
 }
 
-.elevation-svg {
+.playback__elevation-svg {
   width: 100%;
   height: 100%;
 }
 
-.progress-head {
+.playback__head {
   position: absolute;
   top: 0;
   bottom: -6px;
@@ -477,14 +467,14 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.head-line {
+.playback__head-line {
   width: 2px;
   height: 100%;
   background: var(--color-accent);
   border-radius: 1px;
 }
 
-.head-dot {
+.playback__head-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -497,14 +487,14 @@ onBeforeUnmount(() => {
 }
 
 /* Progress Bar */
-.progress-bar-track {
+.playback__bar-track {
   height: 3px;
   background: var(--color-progress-track);
   border-radius: 2px;
   overflow: hidden;
 }
 
-.progress-bar-fill {
+.playback__bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--color-accent), var(--color-accent-dark));
   border-radius: 2px;
@@ -513,7 +503,7 @@ onBeforeUnmount(() => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .playback-bar {
+  .playback {
     min-width: unset;
     width: calc(100% - 32px);
     padding: 6px 12px;
@@ -521,25 +511,25 @@ onBeforeUnmount(() => {
     bottom: 16px;
   }
 
-  .stats-group {
+  .playback__stats {
     gap: 10px;
   }
 
-  .stat-value {
+  .playback__stat-value {
     font-size: 13px;
   }
 
-  .progress-track {
+  .playback__track {
     min-width: 80px;
   }
 }
 
 @media (max-width: 550px) {
-  .stats-right {
+  .playback__stats--right {
     display: none;
   }
 
-  .stats-group {
+  .playback__stats {
     gap: 8px;
   }
 }

@@ -112,6 +112,9 @@ const tokens = {
     borderRadiusCard: '12px',
     borderRadiusBadge: '20px',
     borderRadiusBtn: '8px',
+    zIndexOverlay: 1000,
+    zIndexHeader: 100,
+    spacingOverlayBottom: '24px',
   },
 
   /* ── Transitions ────────────────────────────────────────────── */
