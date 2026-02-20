@@ -91,6 +91,7 @@ export function tokensToCSS(tokens) {
     'radius-btn': layout.borderRadiusBtn,
     'z-overlay': layout.zIndexOverlay,
     'z-header': layout.zIndexHeader,
+    'spacing-overlay-top': layout.spacingOverlayTop,
     'spacing-overlay-bottom': layout.spacingOverlayBottom,
   });
 
