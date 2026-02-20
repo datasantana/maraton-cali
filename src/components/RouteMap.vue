@@ -74,6 +74,7 @@ function initMap() {
     center: mapboxConfig.center,
     zoom: mapboxConfig.zoom,
     pitch: mapboxConfig.pitch,
+    fadeDuration: 0,  // Skip tile fade-in for smoother animation performance
   });
 
   // Add navigation control with a compass and zoom controls.
