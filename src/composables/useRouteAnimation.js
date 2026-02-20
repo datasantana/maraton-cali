@@ -2,10 +2,10 @@
  * useRouteAnimation — Composable that encapsulates the route animation logic.
  *
  * Manages:
- *  - Mapbox sources & layers (full route, animated line, head marker)
  *  - `requestAnimationFrame` loop (frame → updateDisplay → camera)
  *  - Play / pause / speed / seek controls (driven by parent via props)
- *  - Marks layer (currently inactive — preserved for future use)
+ *
+ * Delegates layer management to useMapLayers and marks to useMarkers.
  *
  * Captured closure variables (startTime, isPaused, speed, …) avoid Vue
  * reactivity overhead for high-frequency animation state.
@@ -19,6 +19,8 @@ import { watch, onBeforeUnmount } from 'vue';
 import mapboxgl from 'mapbox-gl';
 import turf from 'turf';
 import tokens from '@/theme/tokens';
+import { useMapLayers } from '@/composables/useMapLayers';
+import { useMarkers } from '@/composables/useMarkers';
 
 export function useRouteAnimation(props, emit) {
   // Control closures — assigned inside setup() once the map + data are ready
@@ -81,6 +83,10 @@ export function useRouteAnimation(props, emit) {
     lineFeature.geometry.coordinates.forEach(coord => {
       routeBounds.extend([coord[0], coord[1]]);
     });
+
+    // --- Initialize map layers and marks ---
+    const { showAnimationLayers, showOverviewLayers } = useMapLayers(map, lineFeature);
+    useMarkers(map, marksData, props.showMarks);
 
     // --- Speed control (called from speed watcher) ---
     _setSpeed = (newSpeed) => {
@@ -198,9 +204,7 @@ export function useRouteAnimation(props, emit) {
         updateDisplay(0, false);
 
         // Show animated layers, hide full route
-        map.setLayoutProperty('lineLayer', 'visibility', 'visible');
-        map.setLayoutProperty('headLayer', 'visibility', 'visible');
-        map.setLayoutProperty('fullRouteLayer', 'visibility', 'none');
+        showAnimationLayers();
 
         // Fly to start point of route (pitch 45, zoom 17)
         const startCoords = lineFeature.geometry.coordinates[0];
@@ -221,8 +225,8 @@ export function useRouteAnimation(props, emit) {
         // ── RESUME FROM PAUSE ───────────────────────────────────────
         isPaused = false;
 
-        // Hide full route
-        map.setLayoutProperty('fullRouteLayer', 'visibility', 'none');
+        // Show animated layers, hide full route
+        showAnimationLayers();
 
         if (savedCameraState) {
           map.flyTo({
@@ -266,7 +270,7 @@ export function useRouteAnimation(props, emit) {
         };
 
         // Show full route in gray behind animated progress
-        map.setLayoutProperty('fullRouteLayer', 'visibility', 'visible');
+        showOverviewLayers();
 
         // Fly to fit route extent, top-down view
         const fitCamera = map.cameraForBounds(routeBounds, { padding: 50 });
@@ -302,103 +306,6 @@ export function useRouteAnimation(props, emit) {
         _animationFrame = window.requestAnimationFrame(frame);
       }
     };
-
-    // ---------------------------------------------------------------
-    // Marks system — preserved for future use.
-    // Set showMarks=true and provide marksData with Point features
-    // to reactivate the markers layer.
-    // TODO: Replace require() paths with Vite-compatible imports
-    //       (new URL('../assets/marker.png', import.meta.url).href)
-    //       when this feature is reactivated.
-    // ---------------------------------------------------------------
-    if (props.showMarks && marksData && marksData.features && marksData.features.length > 0) {
-      map.addSource('marks', {
-        type: 'geojson',
-        data: marksData,
-      });
-      // loadMarkerImagesAndLayers(map) — reactivate when mark images are available
-    }
-
-    // --- Full route layer (visible initially and when paused) ---
-    map.addSource('full-route', {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: lineFeature.geometry.coordinates,
-        },
-      },
-    });
-    map.addLayer({
-      id: 'fullRouteLayer',
-      type: 'line',
-      source: 'full-route',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round',
-        'visibility': 'visible',
-      },
-      paint: {
-        'line-color': tokens.colors.route.full,
-        'line-width': 5,
-        'line-opacity': 0.8,
-        'line-dasharray': [2, 2],
-      },
-    });
-
-    // --- Animated route line source (initially hidden) ---
-    map.addSource('line', {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: lineFeature.geometry.coordinates,
-        },
-      },
-      lineMetrics: true,
-    });
-
-    // Add a layer to visualize the animated line (initially hidden)
-    map.addLayer({
-      id: 'lineLayer',
-      type: 'line',
-      source: 'line',
-      layout: {
-        'line-join': 'round',
-        'line-cap': 'round',
-        'visibility': 'none',
-      },
-      paint: {
-        'line-color': tokens.colors.route.animatedLine,
-        'line-width': 8,
-      },
-    });
-
-    // --- Animated head marker (red circle at front of the path) ---
-    map.addSource('head', {
-      type: 'geojson',
-      data: {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: [],
-        },
-      },
-    });
-    map.addLayer({
-      id: 'headLayer',
-      type: 'circle',
-      source: 'head',
-      layout: {
-        'visibility': 'none',
-      },
-      paint: {
-        'circle-radius': 15,
-        'circle-color': tokens.colors.route.head,
-      },
-    });
 
     // --- Fit map to full route extent, top-down view (initial state) ---
     map.fitBounds(routeBounds, {
