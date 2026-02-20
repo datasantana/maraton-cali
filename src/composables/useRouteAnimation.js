@@ -207,13 +207,14 @@ export function useRouteAnimation(props, emit) {
         showAnimationLayers();
 
         // Fly to start point of route (pitch 45, zoom 17)
+        // Duration doubled to let tiles load before animation begins
         const startCoords = lineFeature.geometry.coordinates[0];
         map.flyTo({
           center: [startCoords[0], startCoords[1]],
           zoom: 17,
           pitch: 45,
           bearing: 0,
-          duration: 2000,
+          duration: 4000,
         });
 
         map.once('moveend', () => {
@@ -229,9 +230,10 @@ export function useRouteAnimation(props, emit) {
         showAnimationLayers();
 
         if (savedCameraState) {
+          // Duration doubled to let tiles load before animation resumes
           map.flyTo({
             ...savedCameraState,
-            duration: 1500,
+            duration: 3000,
           });
 
           map.once('moveend', () => {
@@ -273,13 +275,14 @@ export function useRouteAnimation(props, emit) {
         showOverviewLayers();
 
         // Fly to fit route extent, top-down view
+        // Duration doubled for smoother overview transition
         const fitCamera = map.cameraForBounds(routeBounds, { padding: 50 });
         map.flyTo({
           center: fitCamera.center,
           zoom: fitCamera.zoom,
           pitch: 0,
           bearing: 0,
-          duration: 1500,
+          duration: 3000,
         });
       }
     };
