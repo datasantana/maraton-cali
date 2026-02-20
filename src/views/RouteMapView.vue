@@ -1,7 +1,12 @@
 <template>
   <div class="route-view" ref="routeViewContainer">
-    <div v-if="loading" class="loading">Loading route...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <LoadingSpinner v-if="loading" message="Loading route…" />
+    <ErrorMessage
+      v-else-if="error"
+      :message="error"
+      retryable
+      @retry="retryLoad"
+    />
     <!--
       RouteMap and PlayBack are siblings inside the parent so that progress,
       playing and speed state can be managed here and passed via props.
@@ -43,11 +48,13 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { ref, watch, onErrorCaptured } from 'vue';
 import { useRoute } from 'vue-router';
 import RouteMap from '@/components/RouteMap.vue';
 import PlayBack from '@/components/PlayBack.vue';
 import RaceTitle from '@/components/RaceTitle.vue';
+import LoadingSpinner from '@/components/LoadingSpinner.vue';
+import ErrorMessage from '@/components/ErrorMessage.vue';
 import { parseElevationCsv } from '@/utils/parseElevationCsv';
 import eventData from '@/assets/event.json';
 
@@ -186,6 +193,19 @@ function onSpeedChange(speed) {
   currentSpeed.value = speed;
 }
 
+// --- Retry handler ---
+function retryLoad() {
+  loadRouteData(route.params.routeId);
+}
+
+// --- Error boundary — catch unexpected errors from child components ---
+onErrorCaptured((err) => {
+  console.error('RouteMapView caught child error:', err);
+  error.value = 'An unexpected error occurred. Please try again.';
+  loading.value = false;
+  return false; // prevent further propagation
+});
+
 // --- Route change watcher ---
 watch(() => route.params.routeId, (routeId) => {
   loadRouteData(routeId);
@@ -206,19 +226,4 @@ watch(() => route.params.routeId, (routeId) => {
   height: 100%;
 }
 
-.loading,
-.error {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  font-family: var(--font-family);
-  font-size: 1.2rem;
-  color: var(--color-text-muted);
-  background: var(--color-bg);
-}
-
-.error {
-  color: var(--color-diff-challenging-text);
-}
 </style>
