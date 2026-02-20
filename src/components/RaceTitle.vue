@@ -69,8 +69,8 @@ const difficultyClass = computed(() => {
 <style scoped>
 .race-title {
   position: absolute;
-  top: var(--spacing-overlay-bottom);
-  left: var(--spacing-overlay-bottom);
+  top: var(--spacing-overlay-top);
+  left: var(--spacing-overlay-top);
   z-index: var(--z-overlay);
   padding: 16px 20px;
   background: var(--color-bg-glass);
@@ -150,7 +150,7 @@ const difficultyClass = computed(() => {
 /* ─── Mobile: notch centrado ─── */
 @media (max-width: 768px) {
   .race-title {
-    top: 12px;
+    top: var(--spacing-overlay-top);
     left: 50%;
     right: auto;
     transform: translateX(-50%);

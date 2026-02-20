@@ -11,9 +11,26 @@
       {{ currentSpeed }}x
     </button>
 
-    <!-- Progress Section -->
-    <div class="playback__progress">
-      <!-- Stats Left -->
+    <!-- Mini Elevation Chart / Progress Bar — click or drag to scrub -->
+    <div
+      class="playback__track"
+      ref="progressTrack"
+      @mousedown="onScrubStart"
+      @touchstart.prevent="onTouchScrubStart"
+    >
+      <ElevationChart
+        :elevationProfile="elevationProfile"
+        :totalDistance="totalDistance"
+        :progress="progress"
+      />
+      <!-- Progress bar beneath elevation -->
+      <div class="playback__bar-track">
+        <div class="playback__bar-fill" :style="{ width: progressPercent + '%' }"></div>
+      </div>
+    </div>
+
+    <!-- Stats — second row on mobile -->
+    <div class="playback__info">
       <div class="playback__stats">
         <div class="playback__stat">
           <span class="playback__stat-label">DISTANCE</span>
@@ -24,31 +41,12 @@
           <span class="playback__stat-value">{{ formattedElevation }} <small>m</small></span>
         </div>
       </div>
-
-      <!-- Mini Elevation Chart / Progress Bar — click or drag to scrub -->
-      <div
-        class="playback__track"
-        ref="progressTrack"
-        @mousedown="onScrubStart"
-        @touchstart.prevent="onTouchScrubStart"
-      >
-        <ElevationChart
-          :elevationProfile="elevationProfile"
-          :totalDistance="totalDistance"
-          :progress="progress"
-        />
-        <!-- Progress bar beneath elevation -->
-        <div class="playback__bar-track">
-          <div class="playback__bar-fill" :style="{ width: progressPercent + '%' }"></div>
-        </div>
-      </div>
-
-      <!-- Stats Right -->
       <div class="playback__stats playback__stats--right">
         <div class="playback__stat">
           <span class="playback__stat-label">GRADE</span>
-          <span class="playback__stat-value playback__stat-value--accent">{{ formattedSlope }}</span>
+          <span class="playback__stat-value" :style="{ color: gradeColor }">{{ formattedSlope }}</span>
         </div>
+        <!-- Under discussion: Total Ascent and Time stats
         <div class="playback__stat">
           <span class="playback__stat-label">TOTAL ASC.</span>
           <span class="playback__stat-value">{{ formattedTotalAscent }}<small>m</small></span>
@@ -57,6 +55,7 @@
           <span class="playback__stat-label">TIME</span>
           <span class="playback__stat-value">{{ formattedTime }}</span>
         </div>
+        -->
       </div>
     </div>
   </div>
@@ -104,12 +103,21 @@ const emit = defineEmits(['toggle-play', 'speed-change', 'update:progress']);
 // --- Composables ---
 const { progressTrack, onScrubStart, onTouchScrubStart } = useScrub(emit);
 const {
+  currentProfilePoint,
   formattedDistance,
   formattedElevation,
   formattedSlope,
   formattedTotalAscent,
   formattedTime,
 } = usePlaybackStats(props);
+
+/** Dynamic color for the grade stat: green when positive, red when negative */
+const gradeColor = computed(() => {
+  const slope = currentProfilePoint.value?.slope_percent ?? 0;
+  if (slope > 0) return '#00c853';
+  if (slope < 0) return '#E64A19';
+  return null;
+});
 
 // --- Local state ---
 const speedOptions = [1, 1.5, 2, 3, 5];
@@ -206,14 +214,18 @@ function cycleSpeed() {
   background: var(--color-speed-btn-hover-bg);
 }
 
-/* Progress Section */
-.playback__progress {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-  min-width: 0;
+/* Layout wrapper — transparent on desktop (children join parent flex),
+   becomes a real flex row on mobile for the stats row */
+.playback__info {
+  display: contents;
 }
+
+/* Desktop flex order: play → speed → track → stats-left → stats-right */
+.playback__play-btn  { order: 0; }
+.playback__speed-btn { order: 1; }
+.playback__track     { order: 2; }
+.playback__stats     { order: 3; }
+.playback__stats--right { order: 4; }
 
 /* Stats Groups */
 .playback__stats {
@@ -284,36 +296,48 @@ function cycleSpeed() {
   transition: width 0.1s linear;
 }
 
-/* Responsive */
+/* ─── Responsive: two-row layout on mobile ─── */
 @media (max-width: 768px) {
   .playback {
     min-width: unset;
     width: calc(100% - 32px);
+    flex-wrap: wrap;
     padding: 6px 12px;
-    gap: 8px;
-    bottom: 16px;
+    gap: 6px;
+    bottom: var(--spacing-overlay-bottom);
   }
 
-  .playback__stats {
-    gap: 10px;
-  }
-
-  .playback__stat-value {
-    font-size: 13px;
+  /* Row 1: play, speed, elevation chart */
+  .playback__play-btn,
+  .playback__speed-btn,
+  .playback__track {
+    order: unset;
   }
 
   .playback__track {
     min-width: 80px;
   }
-}
 
-@media (max-width: 550px) {
-  .playback__stats--right {
-    display: none;
+  /* Row 2: all stats — wrapper becomes a real flex row */
+  .playback__info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    order: 5; /* push below controls row */
   }
 
   .playback__stats {
-    gap: 8px;
+    gap: 10px;
+    order: unset;
+  }
+
+  .playback__stats--right {
+    order: unset;
+  }
+
+  .playback__stat-value {
+    font-size: 13px;
   }
 }
 </style>

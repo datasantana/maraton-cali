@@ -114,7 +114,8 @@ const tokens = {
     borderRadiusBtn: '8px',
     zIndexOverlay: 1000,
     zIndexHeader: 100,
-    spacingOverlayBottom: '24px',
+    spacingOverlayTop: '30px',
+    spacingOverlayBottom: '36px',
   },
 
   /* ── Transitions ────────────────────────────────────────────── */
