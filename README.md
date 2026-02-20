@@ -53,6 +53,8 @@ src/
 │   ├── PlayBack.vue         # Barra de reproducción: orquesta useScrub + usePlaybackStats + ElevationChart
 │   ├── ElevationChart.vue   # Mini gráfico SVG de elevación con gradiente de progreso
 │   ├── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
+│   ├── LoadingSpinner.vue   # Spinner animado reutilizable con mensaje opcional
+│   ├── ErrorMessage.vue     # Mensaje de error reutilizable con botón de retry
 │   └── icons/               # Componentes SVG icon reutilizables (IconPlay, IconPause, etc.)
 │
 ├── theme/

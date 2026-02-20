@@ -205,11 +205,15 @@ Limpieza realizada. Componentes grandes divididos en composables y subcomponente
 Archivos nuevos: `src/composables/useMapLayers.js`, `src/composables/useMarkers.js`, `src/composables/useScrub.js`, `src/composables/usePlaybackStats.js`, `src/components/ElevationChart.vue`, `src/components/HeroSection.vue`, `src/components/RouteCard.vue`, `src/components/EventFooter.vue`.  
 Archivos modificados: `useRouteAnimation.js`, `PlayBack.vue`, `EventHome.vue`.
 
-### 4.8 Mejoras al manejo de errores y loading (prioridad media)
+### 4.8 ✅ Mejoras al manejo de errores y loading (prioridad media)
 
-- `RouteMapView` ya tiene `loading` y `error`, pero no hay componentes dedicados.
-- Crear componentes `LoadingSpinner.vue` y `ErrorMessage.vue` reutilizables.
-- Añadir boundary de errores a nivel de vista.
+- ✅ Creados componentes reutilizables `LoadingSpinner.vue` y `ErrorMessage.vue`.
+- ✅ `RouteMapView` actualizado para usar `LoadingSpinner` y `ErrorMessage` en lugar de `<div>` inline.
+- ✅ `ErrorMessage` soporta botón de retry (`retryable` prop + `retry` emit).
+- ✅ Añadido error boundary a nivel de vista con `onErrorCaptured` en `RouteMapView`.
+
+Archivos nuevos: `src/components/LoadingSpinner.vue`, `src/components/ErrorMessage.vue`.  
+Archivos modificados: `src/views/RouteMapView.vue`.
 
 ### 4.9 Testing (prioridad baja)
 
