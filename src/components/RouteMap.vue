@@ -9,6 +9,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import mapboxgl from 'mapbox-gl';
 import { useRouteAnimation } from '@/composables/useRouteAnimation';
+import { mapboxConfig } from '@/config/mapbox';
 
 const props = defineProps({
   // GeoJSON FeatureCollection — features[0] must be a LineString
@@ -65,17 +66,14 @@ let map = null;
 const { setup: setupAnimation } = useRouteAnimation(props, emit);
 
 function initMap() {
-  // Mapbox configuration from environment variables
-  mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
+  // Mapbox configuration from centralized config
+  mapboxgl.accessToken = mapboxConfig.accessToken;
   map = new mapboxgl.Map({
     container: mapContainer.value,
-    style: import.meta.env.VITE_MAPBOX_STYLE || 'mapbox://styles/mapbox/standard',
-    center: [
-      parseFloat(import.meta.env.VITE_MAPBOX_CENTER_LNG) || -76.5410942407,
-      parseFloat(import.meta.env.VITE_MAPBOX_CENTER_LAT) || 3.4300127118,
-    ],
-    zoom: 12,
-    pitch: 0,
+    style: mapboxConfig.style,
+    center: mapboxConfig.center,
+    zoom: mapboxConfig.zoom,
+    pitch: mapboxConfig.pitch,
   });
 
   // Add navigation control with a compass and zoom controls.

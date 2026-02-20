@@ -32,29 +32,11 @@
         @mousedown="onScrubStart"
         @touchstart.prevent="onTouchScrubStart"
       >
-        <div class="playback__elevation">
-          <svg viewBox="0 0 300 40" preserveAspectRatio="none" class="playback__elevation-svg">
-            <polyline
-              :points="elevationPoints"
-              fill="none"
-              stroke="url(#progressGradient)"
-              stroke-width="2"
-            />
-            <defs>
-              <linearGradient id="progressGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="#00e676" />
-                <stop :offset="progressPercent + '%'" stop-color="#00e676" />
-                <stop :offset="progressPercent + '%'" stop-color="rgba(255,255,255,0.2)" />
-                <stop offset="100%" stop-color="rgba(255,255,255,0.2)" />
-              </linearGradient>
-            </defs>
-          </svg>
-          <!-- Progress head indicator -->
-          <div class="playback__head" :style="{ left: progressPercent + '%' }">
-            <div class="playback__head-line"></div>
-            <div class="playback__head-dot"></div>
-          </div>
-        </div>
+        <ElevationChart
+          :elevationProfile="elevationProfile"
+          :totalDistance="totalDistance"
+          :progress="progress"
+        />
         <!-- Progress bar beneath elevation -->
         <div class="playback__bar-track">
           <div class="playback__bar-fill" :style="{ width: progressPercent + '%' }"></div>
@@ -81,9 +63,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue';
+import { ref, computed } from 'vue';
 import IconPlay from '@/components/icons/IconPlay.vue';
 import IconPause from '@/components/icons/IconPause.vue';
+import ElevationChart from '@/components/ElevationChart.vue';
+import { useScrub } from '@/composables/useScrub';
+import { usePlaybackStats } from '@/composables/usePlaybackStats';
 
 const props = defineProps({
   playing: {
@@ -116,135 +101,30 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-play', 'speed-change', 'update:progress']);
 
-// --- Reactive state ---
+// --- Composables ---
+const { progressTrack, onScrubStart, onTouchScrubStart } = useScrub(emit);
+const {
+  formattedDistance,
+  formattedElevation,
+  formattedSlope,
+  formattedTotalAscent,
+  formattedTime,
+} = usePlaybackStats(props);
+
+// --- Local state ---
 const speedOptions = [1, 1.5, 2, 3, 5];
 const speedIndex = ref(0);
-const isScrubbing = ref(false);
 
-// Template ref for scrub interaction
-const progressTrack = ref(null);
-
-// --- Private scrub handlers (non-reactive, captured in closures) ---
-let _onScrubMove = null;
-let _onScrubEnd = null;
-
-// --- Computed properties ---
-
+// --- Computed ---
 const isPlaying = computed(() => props.playing);
-
 const progressPercent = computed(() => Math.min(props.progress * 100, 100));
-
-// Binary search for the nearest elevation profile point by cumulative distance
-function findNearestPoint(distanceKm) {
-  const profile = props.elevationProfile;
-  if (!profile || profile.length === 0) return null;
-
-  let lo = 0;
-  let hi = profile.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >> 1;
-    if (profile[mid].distance_km_cum < distanceKm) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  return profile[lo];
-}
-
-const currentProfilePoint = computed(() => {
-  if (!props.elevationProfile || props.elevationProfile.length === 0) {
-    return null;
-  }
-  const currentDist = props.progress * props.totalDistance;
-  return findNearestPoint(currentDist);
-});
-
-const formattedDistance = computed(() => {
-  const dist = props.progress * props.totalDistance;
-  return dist.toFixed(1);
-});
-
-const formattedElevation = computed(() => {
-  if (!currentProfilePoint.value) return '0';
-  return Math.round(currentProfilePoint.value.ele);
-});
-
-const formattedSlope = computed(() => {
-  if (!currentProfilePoint.value) return '+0.0%';
-  const slope = currentProfilePoint.value.slope_percent;
-  const sign = slope >= 0 ? '+' : '';
-  return `${sign}${slope.toFixed(1)}%`;
-});
-
-const formattedTotalAscent = computed(() => {
-  if (!currentProfilePoint.value) return '0';
-  return Math.round(currentProfilePoint.value.elev_gain_pos_cum_m);
-});
-
-const formattedTime = computed(() => {
-  if (!props.elevationProfile || props.elevationProfile.length === 0 || !currentProfilePoint.value) {
-    return '00:00:00';
-  }
-  const startTime = new Date(props.elevationProfile[0].time).getTime();
-  const currentTime = new Date(currentProfilePoint.value.time).getTime();
-  const totalSeconds = Math.max(0, Math.floor((currentTime - startTime) / 1000));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return [
-    String(h).padStart(2, '0'),
-    String(m).padStart(2, '0'),
-    String(s).padStart(2, '0'),
-  ].join(':');
-});
 
 const currentSpeed = computed(() => {
   const speed = speedOptions[speedIndex.value];
   return Number.isInteger(speed) ? speed : speed.toFixed(1);
 });
 
-// Generate SVG polyline points from real elevation profile data
-const elevationPoints = computed(() => {
-  if (!props.elevationProfile || props.elevationProfile.length === 0) {
-    // Fallback placeholder when no profile data is available (legacy routes)
-    return '0,20 15,18 30,15 50,19 70,14 90,17 110,12 130,16 150,10 170,13 190,8 210,12 230,6 250,10 270,8 290,12 300,10';
-  }
-
-  const profile = props.elevationProfile;
-  const maxDist = props.totalDistance || profile[profile.length - 1].distance_km_cum || 1;
-
-  // Find elevation range for Y-axis scaling
-  let minEle = Infinity, maxEle = -Infinity;
-  for (const p of profile) {
-    if (p.ele < minEle) minEle = p.ele;
-    if (p.ele > maxEle) maxEle = p.ele;
-  }
-  const eleRange = maxEle - minEle || 1;
-
-  // Downsample to ~150 points for a smooth SVG without excessive DOM nodes
-  const maxPoints = 150;
-  const step = Math.max(1, Math.floor(profile.length / maxPoints));
-
-  const points = [];
-  for (let i = 0; i < profile.length; i += step) {
-    const p = profile[i];
-    const x = (p.distance_km_cum / maxDist) * 300;
-    const y = 40 - ((p.ele - minEle) / eleRange) * 34 - 3;
-    points.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-
-  // Always include the last point for a complete profile
-  const last = profile[profile.length - 1];
-  const lastX = (last.distance_km_cum / maxDist) * 300;
-  const lastY = 40 - ((last.ele - minEle) / eleRange) * 34 - 3;
-  points.push(`${lastX.toFixed(1)},${lastY.toFixed(1)}`);
-
-  return points.join(' ');
-});
-
 // --- Methods ---
-
 function togglePlay() {
   emit('toggle-play', !isPlaying.value);
 }
@@ -253,65 +133,6 @@ function cycleSpeed() {
   speedIndex.value = (speedIndex.value + 1) % speedOptions.length;
   emit('speed-change', speedOptions[speedIndex.value]);
 }
-
-// Compute progress (0–1) from pointer X position on the track
-function updateScrubProgress(event) {
-  const track = progressTrack.value;
-  if (!track) return;
-
-  const rect = track.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const progress = Math.max(0, Math.min(1, x / rect.width));
-  emit('update:progress', progress);
-}
-
-// --- Scrub interaction: mouse ---
-function onScrubStart(event) {
-  isScrubbing.value = true;
-  updateScrubProgress(event);
-
-  _onScrubMove = (e) => {
-    if (isScrubbing.value) {
-      updateScrubProgress(e);
-    }
-  };
-  _onScrubEnd = () => {
-    isScrubbing.value = false;
-    document.removeEventListener('mousemove', _onScrubMove);
-    document.removeEventListener('mouseup', _onScrubEnd);
-  };
-  document.addEventListener('mousemove', _onScrubMove);
-  document.addEventListener('mouseup', _onScrubEnd);
-}
-
-// --- Scrub interaction: touch ---
-function onTouchScrubStart(event) {
-  isScrubbing.value = true;
-  updateScrubProgress(event.touches[0]);
-
-  const onTouchMove = (e) => {
-    if (isScrubbing.value) {
-      updateScrubProgress(e.touches[0]);
-    }
-  };
-  const onTouchEnd = () => {
-    isScrubbing.value = false;
-    document.removeEventListener('touchmove', onTouchMove);
-    document.removeEventListener('touchend', onTouchEnd);
-  };
-  document.addEventListener('touchmove', onTouchMove, { passive: true });
-  document.addEventListener('touchend', onTouchEnd);
-}
-
-// --- Cleanup ---
-onBeforeUnmount(() => {
-  if (_onScrubMove) {
-    document.removeEventListener('mousemove', _onScrubMove);
-  }
-  if (_onScrubEnd) {
-    document.removeEventListener('mouseup', _onScrubEnd);
-  }
-});
 </script>
 
 <style scoped>
@@ -446,44 +267,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 4px;
   position: relative;
-}
-
-.playback__elevation {
-  position: relative;
-  height: 36px;
-}
-
-.playback__elevation-svg {
-  width: 100%;
-  height: 100%;
-}
-
-.playback__head {
-  position: absolute;
-  top: 0;
-  bottom: -6px;
-  width: 2px;
-  transform: translateX(-50%);
-  pointer-events: none;
-}
-
-.playback__head-line {
-  width: 2px;
-  height: 100%;
-  background: var(--color-accent);
-  border-radius: 1px;
-}
-
-.playback__head-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  position: absolute;
-  bottom: -3px;
-  left: 50%;
-  transform: translateX(-50%);
-  box-shadow: 0 0 6px rgba(0, 230, 118, 0.5);
 }
 
 /* Progress Bar */
