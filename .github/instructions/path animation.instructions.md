@@ -29,7 +29,11 @@ src/
   config/
     mapbox.js               → Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
   composables/              → Composables de dominio (lógica reutilizable)
-    useRouteAnimation.js    → Animación del mapa (capas, frame loop, controles)
+    useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
+    useMapLayers.js         → Configuración de sources y layers de Mapbox (full route, animated line, head)
+    useMarkers.js           → Sistema de marcas (actualmente inactivo, preservado para uso futuro)
+    useScrub.js             → Interacción de scrub (mouse/touch) en la barra de reproducción
+    usePlaybackStats.js     → Estadísticas computadas del playback (distancia, elevación, pendiente, etc.)
   theme/
     useTheme.js             → Toggle dark/light, localStorage, cross-tab sync
     tokensToCSS.js          → Generador: tokens.js → CSS custom properties
@@ -100,17 +104,21 @@ Prefijo `VITE_` (requisito Vite). Definidas en `.env`:
 La animación se encapsula en el composable `useRouteAnimation(props, emit)` en `src/composables/useRouteAnimation.js`:
 
 - Retorna `{ setup }` — función que recibe la instancia de `mapboxgl.Map` una vez cargada.
+- Delega configuración de sources/layers a `useMapLayers(map, lineFeature)` (retorna `showAnimationLayers`, `showOverviewLayers`).
+- Delega sistema de marcas a `useMarkers(map, marksData, showMarks)`.
 - `frame()` — loop de `requestAnimationFrame` que calcula la fase de animación.
 - `updateDisplay(phase, moveCamera)` — actualiza posición del marcador, gradiente de la línea y cámara.
 - `_togglePause(playing)`, `_seekToPhase(targetPhase)`, `_setSpeed(newSpeed)` — closures internas conectadas a watchers de props.
 
 **Importante**: estas closures capturan variables locales (`startTime`, `isPaused`, `speed`, etc.) para evitar reactividad innecesaria de Vue. Los watchers en el composable referencian las closures mediante variables mutables del scope de `useRouteAnimation`.
 
-### 3.3 Perfil de elevación
+### 3.3 Perfil de elevación y playback
 
 - `parseElevationCsv()` convierte CSV raw a array de objetos tipados.
-- `PlayBack.vue` usa binary search (`_findNearestPoint`) para localizar el punto del perfil según la distancia actual.
-- El SVG polyline se genera en el computed `elevationPoints`, downsampleando a ~150 puntos.
+- `usePlaybackStats(props)` composable calcula estadísticas derivadas (`formattedDistance`, `formattedElevation`, `formattedSlope`, `formattedTotalAscent`, `formattedTime`) usando `findNearestPoint` (binary search por distancia acumulada).
+- `useScrub(emit)` composable encapsula la interacción de scrub (mouse/touch) con cleanup automático.
+- `ElevationChart.vue` renderiza el mini gráfico SVG con polyline downsampleado (~150 puntos) y gradiente de progreso.
+- `PlayBack.vue` orquesta los composables y el subcomponente, manteniendo solo lógica de play/pause y speed.
 
 ---
 
@@ -179,18 +187,23 @@ Configuración centralizada. `src/config/mapbox.js` es la única fuente de lectu
 Archivos nuevos: `src/config/mapbox.js`.  
 Archivos modificados: `RouteMap.vue`, `EventHome.vue`.
 
-### 4.7 Limpieza de código existente (prioridad alta)
+### 4.7 Limpieza de código existente (prioridad alta) — ✅ COMPLETADO
 
-- **`RouteMap.vue` (~650 líneas)**: dividir en:
-  - `useRouteAnimation.js` — composable de animación.
-  - `useMapLayers.js` — configuración de sources y layers de Mapbox.
-  - `useMarkers.js` — sistema de marcas (actualmente inactivo).
-  - El componente queda como orquestador que llama a los composables.
-- **`PlayBack.vue` (~550 líneas)**: separar:
-  - Lógica de scrub → `useScrub.js`.
-  - Estadísticas computadas → `usePlaybackStats.js`.
-  - Template: extraer el mini gráfico de elevación a un subcomponente `ElevationChart.vue`.
-- **`EventHome.vue` (~500 líneas)**: CSS ocupa más del 60%. Evaluar extraer secciones a subcomponentes (`HeroSection.vue`, `RouteCard.vue`, `EventFooter.vue`).
+Limpieza realizada. Componentes grandes divididos en composables y subcomponentes:
+
+1. ✅ **`useRouteAnimation.js`** refactorizado: lógica de sources/layers extraída a `useMapLayers.js`; sistema de marcas a `useMarkers.js`. El composable ahora importa y delega a estos sub-composables, usando `showAnimationLayers()` y `showOverviewLayers()` para gestionar visibilidad de capas.
+2. ✅ **`PlayBack.vue`** dividido:
+   - `useScrub.js` — lógica de scrub mouse/touch con cleanup automático.
+   - `usePlaybackStats.js` — estadísticas computadas (`formattedDistance`, `formattedElevation`, `formattedSlope`, `formattedTotalAscent`, `formattedTime`, `currentProfilePoint`), incluyendo `findNearestPoint` (binary search).
+   - `ElevationChart.vue` — mini gráfico SVG de elevación con gradiente de progreso y cabezal indicador.
+3. ✅ **`EventHome.vue`** dividido:
+   - `HeroSection.vue` — sección hero (título ciudad + fecha).
+   - `RouteCard.vue` — tarjeta de ruta individual (imagen, badge, descripción, botón).
+   - `EventFooter.vue` — footer del evento (logo, links, copyright).
+   - CSS reducido ~70%: solo quedan estilos de header, routes grid y responsive de nav.
+
+Archivos nuevos: `src/composables/useMapLayers.js`, `src/composables/useMarkers.js`, `src/composables/useScrub.js`, `src/composables/usePlaybackStats.js`, `src/components/ElevationChart.vue`, `src/components/HeroSection.vue`, `src/components/RouteCard.vue`, `src/components/EventFooter.vue`.  
+Archivos modificados: `useRouteAnimation.js`, `PlayBack.vue`, `EventHome.vue`.
 
 ### 4.8 Mejoras al manejo de errores y loading (prioridad media)
 
@@ -209,10 +222,12 @@ Archivos modificados: `RouteMap.vue`, `EventHome.vue`.
 
 ## 5. Reglas para contribuir
 
+### 5.1 Reglas generales
+
 1. **No hardcodear colores ni tamaños**: usar siempre `var(--token)` en CSS o importar `tokens` en JS.
 2. **No duplicar estado**: la fuente de verdad del playback está en `RouteMapView`; nunca mantener estado duplicado en hijos.
-3. **Lazy-load assets pesados**: usar `import()` dinámico con `webpackChunkName` para GeoJSON, CSVs y vistas.
-4. **Comentar closures complejas**: las funciones de animación en `RouteMap` deben documentar qué variables capturan y por qué.
+3. **Lazy-load assets pesados**: usar `import()` dinámico para GeoJSON, CSVs y vistas.
+4. **Comentar closures complejas**: las funciones de animación en `useRouteAnimation` deben documentar qué variables capturan y por qué.
 5. **Mantener event.json actualizado**: toda ruta nueva requiere su entrada aquí con todos los campos requeridos (`id`, `name`, `distance`, `distanceUnit`, `difficulty`, `type`, `description`, `duration`, `zoom`).
 6. **Probar ambos temas**: verificar que los cambios visuales funcionen en dark y light mode.
 7. **Responsive**: verificar en mobile (≤768px) y tablet (≤1024px).
@@ -220,3 +235,41 @@ Archivos modificados: `RouteMap.vue`, `EventHome.vue`.
    - **Este archivo** (`.github/instructions/path animation.instructions.md`): actualizar secciones de arquitectura, convenciones, patrones y plan de refactorización según corresponda.
    - **`README.md`**: actualizar diagrama de arquitectura, stack tecnológico, comandos y cualquier sección afectada.
    - La PR/commit no se considera completa hasta que ambos archivos reflejen el estado actual del proyecto.
+
+### 5.2 Agregar una nueva funcionalidad (feature)
+
+Al implementar una nueva funcionalidad, seguir este checklist:
+
+1. **Planificación**:
+   - Definir claramente el alcance de la feature y los archivos que se verán afectados.
+   - Si la feature requiere nuevos datos, definir primero el esquema en `event.json` o crear nuevos archivos en `assets/`.
+   - Evaluar si la lógica es reutilizable — si lo es, crear un composable en `src/composables/`.
+
+2. **Estructura de archivos**:
+   - **Componentes nuevos**: colocar en `src/components/`. Si es un subcomponente específico de otro, considerar si es mejor como componente independiente o como parte de un composable.
+   - **Composables nuevos**: colocar en `src/composables/` con prefijo `use` (ej. `useNewFeature.js`). Documentar con JSDoc: parámetros, retorno y responsabilidades.
+   - **Vistas nuevas**: colocar en `src/views/`, registrar la ruta en `src/router/index.js` y usar lazy-loading (`() => import('@/views/NewView.vue')`).
+   - **Iconos nuevos**: crear componente en `src/components/icons/` siguiendo el patrón existente (props `size` y `color`).
+   - **Configuración nueva**: si requiere variables de entorno, agregar con prefijo `VITE_` en `.env` y documentar en la tabla de sección 2.5.
+
+3. **Estilo y CSS**:
+   - Usar `<style scoped>` en todos los componentes nuevos.
+   - Seguir BEM (`bloque__elemento--modificador`) para nomenclatura de clases.
+   - Referenciar solo tokens CSS (`var(--token)`), nunca valores literales de color/tamaño.
+   - Agregar nuevos tokens a `src/theme/tokens.js` si se necesitan valores que no existen. Recordar que cambios en `tokens.js` requieren reiniciar el dev server.
+   - Actualizar `tokensToCSS.js` si se agregan nuevas categorías de tokens.
+
+4. **Integración con estado existente**:
+   - Si la feature afecta el playback, respetar el flujo unidireccional: hijos emiten eventos → `RouteMapView` actualiza estado → hijos reciben por props.
+   - Si requiere nuevo estado compartido, agregarlo en `RouteMapView` (fuente de verdad).
+   - Si la feature es independiente del playback, puede manejar su propio estado local.
+
+5. **Testing y verificación**:
+   - Ejecutar `npm run build` y verificar que no haya errores.
+   - Probar en ambos temas (dark y light).
+   - Probar en viewports: desktop (>1024px), tablet (≤1024px) y mobile (≤768px).
+   - Si la feature toca la animación, verificar play/pause/scrub/speed en al menos una ruta estándar y una legacy.
+
+6. **Documentación**:
+   - Actualizar **este archivo** (`path animation.instructions.md`): agregar el composable/componente en la sección de estructura correspondiente (2.1, 2.2), documentar el patrón en la sección 3 si introduce un nuevo patrón, y registrar la feature en la sección 4 si es una tarea planificada.
+   - Actualizar **`README.md`**: agregar al diagrama de arquitectura y al flujo de datos si la feature introduce nuevas relaciones entre componentes.

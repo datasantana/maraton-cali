@@ -30,7 +30,11 @@ src/
 ├── router/index.js          # Rutas: / (home), /about, /route/:routeId
 │
 ├── composables/
-│   └── useRouteAnimation.js # Composable de animación del mapa (capas, frame loop, controles)
+│   ├── useRouteAnimation.js # Composable de animación del mapa (frame loop, controles)
+│   ├── useMapLayers.js      # Configuración de sources y layers de Mapbox
+│   ├── useMarkers.js        # Sistema de marcas (actualmente inactivo)
+│   ├── useScrub.js          # Interacción de scrub (mouse/touch) en barra de reproducción
+│   └── usePlaybackStats.js  # Estadísticas computadas del playback
 │
 ├── config/
 │   └── mapbox.js            # Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
@@ -41,9 +45,13 @@ src/
 │   └── AboutView.vue        # Placeholder
 │
 ├── components/
-│   ├── EventHome.vue        # Landing: hero, grid de tarjetas de ruta, header, footer
+│   ├── EventHome.vue        # Landing: header, orquesta HeroSection + RouteCard + EventFooter
+│   ├── HeroSection.vue      # Hero: título ciudad + fecha del evento
+│   ├── RouteCard.vue        # Tarjeta individual de ruta (imagen, badge, descripción, botón)
+│   ├── EventFooter.vue      # Footer del evento (logo, links, copyright)
 │   ├── RouteMap.vue         # Mapa Mapbox con animación vía useRouteAnimation composable
-│   ├── PlayBack.vue         # Barra de reproducción: play/pause, velocidad, scrub, stats
+│   ├── PlayBack.vue         # Barra de reproducción: orquesta useScrub + usePlaybackStats + ElevationChart
+│   ├── ElevationChart.vue   # Mini gráfico SVG de elevación con gradiente de progreso
 │   ├── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
 │   └── icons/               # Componentes SVG icon reutilizables (IconPlay, IconPause, etc.)
 │
@@ -68,13 +76,26 @@ src/
 ### Flujo de datos principal
 
 ```
-event.json ──▶ EventHome (tarjetas) ──▶ router-link /route/:id
-                                              │
-                                              ▼
-                                     RouteMapView (orquestador)
-                                      ┌───────┼───────┐
-                                      ▼       ▼       ▼
-                                 RouteMap  PlayBack  RaceTitle
+event.json ──▶ EventHome (orquestador) ──▶ router-link /route/:id
+                 ┌──────┼──────┐
+                 ▼      ▼      ▼
+            HeroSection RouteCard EventFooter
+                                      │
+                                      ▼
+                             RouteMapView (orquestador)
+                              ┌───────┼───────┐
+                              ▼       ▼       ▼
+                         RouteMap  PlayBack  RaceTitle
+                              │    ┌──┼──┐
+                              │    ▼  ▼  ▼
+                              │  ElevationChart
+                              │  useScrub
+                              │  usePlaybackStats
+                              ▼
+                     useRouteAnimation
+                       ┌──────┼──────┐
+                       ▼      ▼      ▼
+                  useMapLayers useMarkers (camera/frame)
 ```
 
 1. **`RouteMapView`** carga dinámicamente los assets (`.geojson` + `.csv`) según el `routeId`.
