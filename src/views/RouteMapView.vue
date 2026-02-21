@@ -20,7 +20,7 @@
         :progress="progress"
         :playing="isPlaying"
         :speed="currentSpeed"
-        :showMarks="false"
+        :showMarks="true"
         :fullscreenContainer="routeViewContainer"
         @update:progress="onMapProgress"
       />
@@ -56,6 +56,7 @@ import RaceTitle from '@/components/RaceTitle.vue';
 import LoadingSpinner from '@/components/LoadingSpinner.vue';
 import ErrorMessage from '@/components/ErrorMessage.vue';
 import { parseElevationCsv } from '@/utils/parseElevationCsv';
+import { flattenGeoJson } from '@/utils/flattenGeoJson';
 import eventData from '@/assets/event.json';
 
 // Build route lookup from centralized event config.
@@ -127,31 +128,39 @@ async function loadRouteData(routeId) {
       elevationProfile.value = [];
       totalDistance.value = 0;
     } else {
-      // Standard route: GeoJSON + elevation CSV
+      // Standard route: GeoJSON + elevation CSV + marks (optional)
       const [geojsonModule, csvModule] = await Promise.all([
         import(`@/assets/routes/${routeId}.geojson`),
         import(`@/assets/elevation/${routeId}.csv?raw`),
       ]);
 
-      const geojson = geojsonModule.default || geojsonModule;
+      const rawGeojson = geojsonModule.default || geojsonModule;
       const csvText = csvModule.default || csvModule;
 
-      // Split GeoJSON into:
-      //   - pathData:  FeatureCollection with the LineString (route geometry)
-      //   - marksData: FeatureCollection with Point features (enriched waypoints)
+      // Flatten GeoJSON: strip Z (elevation) values from coordinates and
+      // normalise MultiLineString → LineString so Mapbox only receives 2D data.
+      const geojson = flattenGeoJson(rawGeojson);
+
+      // Extract the LineString (route geometry) for pathData
       const lineFeature = geojson.features.find(f => f.geometry.type === 'LineString');
-      const pointFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
 
       pathData.value = {
         type: 'FeatureCollection',
         features: lineFeature ? [lineFeature] : [],
       };
 
-      // Marks preserved for future use (currently showMarks=false on RouteMap)
-      marksData.value = {
-        type: 'FeatureCollection',
-        features: pointFeatures,
-      };
+      // Load named marks from marks/{id}.json (KM markers, hydration, start/finish)
+      // Falls back to GeoJSON Point features if marks file is unavailable.
+      try {
+        const marksModule = await import(`@/assets/marks/${routeId}.json`);
+        marksData.value = marksModule.default || marksModule;
+      } catch {
+        const pointFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
+        marksData.value = {
+          type: 'FeatureCollection',
+          features: pointFeatures,
+        };
+      }
 
       // Parse elevation CSV into numeric-typed array
       elevationProfile.value = parseElevationCsv(csvText);
