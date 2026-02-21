@@ -66,7 +66,8 @@ src/
 │   └── variables.css        # Shell — contenido generado por cssTokensPlugin desde tokens.js
 │
 ├── utils/
-│   └── parseElevationCsv.js # Parser CSV → array de objetos con tipos numéricos
+│   ├── parseElevationCsv.js # Parser CSV → array de objetos con tipos numéricos
+│   └── flattenGeoJson.js   # Strips 3D (Z) coords and normalises geometries to flat 2D LineStrings/Points
 │
 └── assets/
     ├── event.json           # Config centralizada del evento (ciudad, fecha, rutas)
