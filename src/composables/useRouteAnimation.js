@@ -86,7 +86,7 @@ export function useRouteAnimation(props, emit) {
 
     // --- Initialize map layers and marks ---
     const { showAnimationLayers, showOverviewLayers } = useMapLayers(map, lineFeature);
-    useMarkers(map, marksData, props.showMarks);
+    const { showOverviewMarks, showAnimationMarks, updateHeadPosition } = useMarkers(map, marksData, props.showMarks);
 
     // --- Speed control (called from speed watcher) ---
     _setSpeed = (newSpeed) => {
@@ -143,20 +143,24 @@ export function useRouteAnimation(props, emit) {
         geometry: { type: 'Point', coordinates: [lng, lat] },
       });
 
+      // Update mark interactions (start/finish visibility + proximity scaling)
+      updateHeadPosition(lng, lat, phase);
+
       // Two-tone gradient on the route line
+      // Uses a single interpolate expression with a near-instant transition to
+      // transparent at the leading edge. Avoids `case` + `<` which causes a
+      // second-line rendering artifact in the gradient texture.
+      // Reference: https://www.mapbox.com/blog/building-cinematic-route-animations-with-mapboxgl
       const safePhase = Math.max(phase, 0.0001);
       map.setPaintProperty('lineLayer', 'line-gradient', [
-        'case',
-        ['<', ['line-progress'], safePhase],
-        [
-          'interpolate',
-          ['linear'],
-          ['line-progress'],
-          0,
-          tokens.colors.route.gradientStart,
-          safePhase,
-          tokens.colors.route.gradientEnd,
-        ],
+        'interpolate',
+        ['linear'],
+        ['line-progress'],
+        0,
+        tokens.colors.route.gradientStart,
+        safePhase,
+        tokens.colors.route.gradientEnd,
+        Math.min(safePhase + 0.0001, 1),
         'rgba(0, 0, 0, 0)',
       ]);
     };
@@ -203,8 +207,9 @@ export function useRouteAnimation(props, emit) {
         // Initialize the animated progress display at phase 0
         updateDisplay(0, false);
 
-        // Show animated layers, hide full route
+        // Show animated layers, hide full route; switch marks to icon mode
         showAnimationLayers();
+        showAnimationMarks();
 
         // Fly to start point of route (pitch 45, zoom 17)
         // Duration doubled to let tiles load before animation begins
@@ -226,8 +231,9 @@ export function useRouteAnimation(props, emit) {
         // ── RESUME FROM PAUSE ───────────────────────────────────────
         isPaused = false;
 
-        // Show animated layers, hide full route
+        // Show animated layers, hide full route; switch marks to icon mode
         showAnimationLayers();
+        showAnimationMarks();
 
         if (savedCameraState) {
           // Duration doubled to let tiles load before animation resumes
@@ -271,8 +277,9 @@ export function useRouteAnimation(props, emit) {
           bearing: map.getBearing(),
         };
 
-        // Show full route in gray behind animated progress
+        // Show full route in gray behind animated progress; switch marks to overview dots
         showOverviewLayers();
+        showOverviewMarks();
 
         // Fly to fit route extent, top-down view
         // Duration doubled for smoother overview transition

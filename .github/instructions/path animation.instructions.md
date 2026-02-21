@@ -16,7 +16,7 @@ src/
   components/     → Componentes reutilizables de UI
   config/         → Configuración centralizada (Mapbox, etc.)
   theme/          → Tokens de diseño, mixin de tema, variables CSS
-  utils/          → Funciones puras de utilidad
+  utils/          → Funciones puras de utilidad (parseElevationCsv, flattenGeoJson)
   composables/    → Composables de dominio (lógica reutilizable)
   assets/         → Datos estáticos (JSON, GeoJSON, CSV, imágenes)
   router/         → Definición de rutas de Vue Router
@@ -31,7 +31,7 @@ src/
   composables/              → Composables de dominio (lógica reutilizable)
     useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
     useMapLayers.js         → Configuración de sources y layers de Mapbox (full route, animated line, head)
-    useMarkers.js           → Sistema de marcas (actualmente inactivo, preservado para uso futuro)
+    useMarkers.js           → Sistema de marcas (activo: carga íconos por categoría de marca)
     useScrub.js             → Interacción de scrub (mouse/touch) en la barra de reproducción
     usePlaybackStats.js     → Estadísticas computadas del playback (distancia, elevación, pendiente, etc.)
   theme/
@@ -114,6 +114,7 @@ La animación se encapsula en el composable `useRouteAnimation(props, emit)` en 
 
 ### 3.3 Perfil de elevación y playback
 
+- `flattenGeoJson(geojson)` normaliza un FeatureCollection: elimina coordenadas Z (elevación), convierte `MultiLineString` → `LineString`, descarta geometrías no soportadas; el resultado sólo contiene `LineString` y `Point` 2D.
 - `parseElevationCsv()` convierte CSV raw a array de objetos tipados.
 - `usePlaybackStats(props)` composable calcula estadísticas derivadas (`formattedDistance`, `formattedElevation`, `formattedSlope`, `formattedTotalAscent`, `formattedTime`) usando `findNearestPoint` (binary search por distancia acumulada).
 - `useScrub(emit)` composable encapsula la interacción de scrub (mouse/touch) con cleanup automático.
