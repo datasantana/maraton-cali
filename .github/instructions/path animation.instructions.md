@@ -31,7 +31,8 @@ src/
   composables/              → Composables de dominio (lógica reutilizable)
     useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
     useMapLayers.js         → Configuración de sources y layers de Mapbox (full route, animated line, head)
-    useMarkers.js           → Sistema de marcas (activo: carga íconos por categoría de marca)
+    useMarkers.js           → Marcas de KM (círculos naranja siempre visibles) + popup de proximidad durante animación
+    useMarkPopup.js         → Popup reutilizable Mapbox GL para mostrar íconos de marcas agrupadas por jerarquía
     useScrub.js             → Interacción de scrub (mouse/touch) en la barra de reproducción
     usePlaybackStats.js     → Estadísticas computadas del playback (distancia, elevación, pendiente, etc.)
   theme/
@@ -105,7 +106,10 @@ La animación se encapsula en el composable `useRouteAnimation(props, emit)` en 
 
 - Retorna `{ setup }` — función que recibe la instancia de `mapboxgl.Map` una vez cargada.
 - Delega configuración de sources/layers a `useMapLayers(map, lineFeature)` (retorna `showAnimationLayers`, `showOverviewLayers`).
-- Delega sistema de marcas a `useMarkers(map, marksData, showMarks)`.
+- Delega sistema de marcas a `useMarkers(map, marksData, showMarks)` (retorna `updateHeadPosition`, `resetPopup`).
+- `useMarkers` delega la UI del popup a `useMarkPopup(map)` — popup reutilizable de Mapbox GL.
+- **Marcas en el mapa**: solo los KM se muestran como círculos naranja (siempre visibles, sin cambio entre play/pause). El resto de marcas (agua, gatorade, going, salida, llegada) se muestran exclusivamente mediante popup de proximidad durante la animación.
+- **Popup de proximidad**: marcas cercanas se agrupan en clusters; cuando la cabeza de la carrera se acerca a un cluster, aparece un popup con los íconos PNG ordenados por jerarquía (KM → Agua → Gatorade → Going). Solo un popup visible a la vez.
 - `frame()` — loop de `requestAnimationFrame` que calcula la fase de animación.
 - `updateDisplay(phase, moveCamera)` — actualiza posición del marcador, gradiente de la línea y cámara.
 - `_togglePause(playing)`, `_seekToPhase(targetPhase)`, `_setSpeed(newSpeed)` — closures internas conectadas a watchers de props.

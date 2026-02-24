@@ -76,6 +76,7 @@ export function tokensToCSS(tokens) {
     'color-route-full': colors.route.full,
     'color-route-line': colors.route.animatedLine,
     'color-route-head': colors.route.head,
+    'color-route-mark-dot': colors.route.markDot,
   });
 
   /* Typography */
