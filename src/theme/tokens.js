@@ -86,6 +86,7 @@ const tokens = {
       head: '#E64A19',
       gradientStart: '#006633',
       gradientEnd: '#E64A19',
+      markDot: '#F57C00',
     },
   },
 
