@@ -3,17 +3,22 @@
  *
  * Behavior:
  *  - Orange KM circle markers are always visible on the map (no play/pause mode switching).
- *  - During animation, a proximity-based popup appears when the race head approaches
- *    any mark (KM, water, gatorade, going, start, finish).
- *  - Nearby marks are clustered only when consecutive in the data array (preserves route order).
+ *  - During animation, a route-fraction geofence popup appears when the race
+ *    head reaches each mark's position along the route.
+ *  - Nearby consecutive marks are clustered and shown together.
  *  - Only one popup is visible at a time.
+ *  - Trigger is based on exact route-fraction projection (turf.pointOnLine),
+ *    not spatial proximity, so route self-intersections don't cause false triggers.
  *
- * @param {mapboxgl.Map} map - Mapbox map instance
- * @param {Object} marksData - GeoJSON FeatureCollection of Point features
- * @param {boolean} showMarks - Whether to activate marks rendering
+ * @param {mapboxgl.Map} map           - Mapbox map instance
+ * @param {Object}       marksData     - GeoJSON FeatureCollection of Point features
+ * @param {boolean}      showMarks     - Whether to activate marks rendering
+ * @param {Object}       lineFeature   - GeoJSON LineString feature of the route
+ * @param {number}       totalDistance - Total route distance (km, from turf.lineDistance)
  * @returns {{ updateHeadPosition: Function, resetPopup: Function }}
  */
 
+import turf from 'turf';
 import { useMarkPopup, classifyMark } from '@/composables/useMarkPopup';
 import tokens from '@/theme/tokens';
 
@@ -21,19 +26,53 @@ import tokens from '@/theme/tokens';
 const KM_FILTER = ['match', ['slice', ['get', 'name'], 0, 2], ['KM'], true, false];
 
 /**
- * Distance threshold (degrees) for grouping nearby marks into a single cluster.
- * ~0.0005 deg ~ 55 m at the equator.
+ * Distance threshold (degrees) for grouping nearby consecutive marks into one cluster.
+ * ~0.0008 deg  90 m at the equator.
  */
-const CLUSTER_THRESHOLD = 0.0005;
+const CLUSTER_THRESHOLD = 0.0008;
 
 /**
- * Distance threshold (degrees) for triggering the popup when the head approaches.
- * ~0.002 deg ~ 220 m  provides a few seconds of visual lead time before the head
- * reaches the exact mark position.
+ * Phase buffer before a cluster's route-fraction where the popup appears.
+ * 0.004 = 0.4% of route (~170 m on 42 km, ~60 m on 15 km).
  */
-const POPUP_THRESHOLD = 0.002;
+const PHASE_LEAD = 0.004;
 
-/** Squared Euclidean distance between two coordinate pairs (in degrees). */
+/**
+ * Phase buffer after a cluster's route-fraction where the popup disappears.
+ * 0.004 = 0.4% of route.
+ */
+const PHASE_TRAIL = 0.004;
+
+/**
+ * Calculate the distance along `lineFeature` to the `snapped` point returned
+ * by turf.pointOnLine.  The legacy `turf` package only provides
+ * `snapped.properties.index` (the segment index) and
+ * `snapped.properties.dist` (Euclidean distance from the original point to
+ * the line), but NOT a `location` (distance along the line) property.
+ *
+ * We therefore sum segment lengths up to `index` and add the partial
+ * distance from the segment start to the snapped point.
+ *
+ * @param {Object} lineFeature - GeoJSON LineString Feature (the route)
+ * @param {Object} snapped     - Point Feature returned by turf.pointOnLine
+ * @returns {number} Distance in km along the route to the snapped point.
+ */
+function distanceAlongRoute(lineFeature, snapped) {
+  const coords = lineFeature.geometry.coordinates;
+  const segIdx = snapped.properties.index;
+  let dist = 0;
+
+  // Sum full segment lengths up to the target segment
+  for (let i = 0; i < segIdx; i++) {
+    dist += turf.distance(turf.point(coords[i]), turf.point(coords[i + 1]));
+  }
+
+  // Add partial distance within the target segment
+  dist += turf.distance(turf.point(coords[segIdx]), snapped);
+  return dist;
+}
+
+/** Squared Euclidean distance between two coordinate pairs (degrees). */
 function sqDist(lng1, lat1, lng2, lat2) {
   const dLng = lng1 - lng2;
   const dLat = lat1 - lat2;
@@ -42,13 +81,10 @@ function sqDist(lng1, lat1, lng2, lat2) {
 
 /**
  * Group marks into clusters of consecutive entries that are spatially close.
- * Only adjacent marks in the original array order are merged — a mark at
- * index j is added to the current cluster only if it is within
- * CLUSTER_THRESHOLD of the mark at index j-1. When a gap is found a new
- * cluster starts.
+ * Only adjacent marks (by array order) are merged.
  *
- * @param {Array<{lng:number, lat:number, name:string, type:string}>} marks
- * @returns {Array<{center:[number,number], marks:Array}>}
+ * @param {Array} marks
+ * @returns {Array<{center:[number,number], marks:Array, startFraction:number, endFraction:number}>}
  */
 function computeClusters(marks) {
   if (marks.length === 0) return [];
@@ -62,62 +98,69 @@ function computeClusters(marks) {
     const curr = marks[i];
 
     if (sqDist(prev.lng, prev.lat, curr.lng, curr.lat) < threshold2) {
-      // Consecutive and close — extend current cluster
       group.push(curr);
     } else {
-      // Gap — finalise current cluster, start a new one
       clusters.push(finaliseCluster(group));
       group = [curr];
     }
   }
-
-  // Don't forget the last group
   clusters.push(finaliseCluster(group));
   return clusters;
 }
 
 /**
- * Compute cluster center (centroid) from a group of marks.
- * @param {Array} group
- * @returns {{center:[number,number], marks:Array}}
+ * Compute cluster center and route-fraction window from a group of marks.
+ * Each mark must already have a `routeFraction` property.
  */
 function finaliseCluster(group) {
   const center = [
     group.reduce((s, m) => s + m.lng, 0) / group.length,
     group.reduce((s, m) => s + m.lat, 0) / group.length,
   ];
-  return { center, marks: group };
+  const fractions = group.map((m) => m.routeFraction);
+  return {
+    center,
+    marks: group,
+    startFraction: Math.min(...fractions),
+    endFraction: Math.max(...fractions),
+  };
 }
 
-export function useMarkers(map, marksData, showMarks) {
+export function useMarkers(map, marksData, showMarks, lineFeature, totalDistance) {
   const noop = () => {};
-  if (!showMarks || !marksData || !marksData.features || marksData.features.length === 0) {
+  if (
+    !showMarks || !marksData || !marksData.features || marksData.features.length === 0
+    || !lineFeature || !totalDistance
+  ) {
     return { updateHeadPosition: noop, resetPopup: noop };
   }
 
-  // -- Classify all marks (preserve original index for sequence tracking) --
+  // -- Classify marks and project each onto the route to get routeFraction --
+  const safeTotalDistance = totalDistance || 1;
   const marks = marksData.features
-    .map((f, i) => ({
-      idx: i,
-      lng: f.geometry.coordinates[0],
-      lat: f.geometry.coordinates[1],
-      name: f.properties.name,
-      type: classifyMark(f.properties.name),
-    }))
-    .filter((m) => m.type !== null);
+    .map((f) => {
+      const type = classifyMark(f.properties.name);
+      if (!type) return null;
 
-  // -- Pre-compute spatial clusters (consecutive only) --
+      const lng = f.geometry.coordinates[0];
+      const lat = f.geometry.coordinates[1];
+      const pt = turf.point([lng, lat]);
+      const snapped = turf.pointOnLine(lineFeature, pt);
+      const alongKm = distanceAlongRoute(lineFeature, snapped);
+      const routeFraction = alongKm / safeTotalDistance;
+
+      return { lng, lat, name: f.properties.name, type, routeFraction };
+    })
+    .filter(Boolean);
+
+  // Sort marks by routeFraction so clustering respects route-traversal order.
+  // Without this, marks that are spatially close but at opposite ends of the
+  // route (e.g. Salida fraction≈0 and Llegada fraction≈1) would form a single
+  // cluster spanning the entire animation.
+  marks.sort((a, b) => a.routeFraction - b.routeFraction);
+
+  // -- Pre-compute clusters (consecutive spatially-close marks) --
   const clusters = computeClusters(marks);
-  const popupThreshold2 = POPUP_THRESHOLD * POPUP_THRESHOLD;
-
-  // Assign each cluster a sequence fraction (0-1) based on the average
-  // original index of its marks. This maps cluster order to approximate
-  // animation phase, allowing cursor recalibration after seek/resume.
-  const lastIdx = marks.length - 1 || 1;
-  clusters.forEach((cluster) => {
-    const avgIdx = cluster.marks.reduce((s, m) => s + m.idx, 0) / cluster.marks.length;
-    cluster.seqFraction = avgIdx / lastIdx;
-  });
 
   // -- GeoJSON source (shared by all layers) --
   map.addSource('marks', { type: 'geojson', data: marksData });
@@ -141,46 +184,22 @@ export function useMarkers(map, marksData, showMarks) {
   // -- Popup instance --
   const { show: showPopup, hide: hidePopup } = useMarkPopup(map);
 
-  // -- Sequential cursor state --
-  // The cursor tracks which cluster the head should encounter next.
-  // It only advances forward, preventing popups from triggering for
-  // geographically-close-but-wrong-section clusters when the route
-  // doubles back near itself.
-  let nextClusterIdx = 0;
+  /** Index of the cluster whose popup is currently showing (-1 = none). */
   let activeClusterIdx = -1;
-  let wasInactive = true;
-
-  /**
-   * Recalibrate the sequential cursor using the animation phase.
-   * Called when transitioning from inactive (paused/seeked) to active so the
-   * cursor points to the correct cluster for the current route position.
-   *
-   * @param {number} phase - Current animation phase (0-1)
-   */
-  function recalibrateCursor(phase) {
-    // Find the first cluster whose seqFraction is at or just past the
-    // current phase. This is the next cluster the head will encounter.
-    nextClusterIdx = clusters.length; // default: all visited
-    for (let i = 0; i < clusters.length; i++) {
-      if (clusters[i].seqFraction >= phase - 0.02) {
-        nextClusterIdx = i;
-        break;
-      }
-    }
-    activeClusterIdx = -1;
-  }
 
   /**
    * Called every animation frame with the current head position.
-   * Uses a sequential cursor so only the next expected cluster in route
-   * order can trigger. When the head enters proximity of that cluster the
-   * popup appears; when it moves away the popup hides and the cursor
-   * advances to the following cluster.
+   * Uses route-fraction geofencing: each cluster has a phase window
+   * [startFraction - LEAD, endFraction + TRAIL]. The popup shows when
+   * `phase` enters that window and hides when it exits.
    *
-   * @param {number} lng    - Head longitude
-   * @param {number} lat    - Head latitude
-   * @param {number} phase  - Animation phase (0-1)
-   * @param {boolean} active - Whether popup interaction is active (false when paused)
+   * Because activation is purely phase-based (not spatial), route
+   * self-intersections cannot cause false triggers.
+   *
+   * @param {number}  lng    - Head longitude (used only for popup anchor if needed)
+   * @param {number}  lat    - Head latitude
+   * @param {number}  phase  - Animation phase (01), equals distance fraction along route
+   * @param {boolean} active - false when paused
    */
   function updateHeadPosition(lng, lat, phase, active = true) {
     if (!active) {
@@ -188,49 +207,37 @@ export function useMarkers(map, marksData, showMarks) {
         hidePopup();
         activeClusterIdx = -1;
       }
-      wasInactive = true;
       return;
     }
 
-    // Recalibrate cursor on transition from inactive to active (resume/seek)
-    if (wasInactive) {
-      wasInactive = false;
-      recalibrateCursor(phase);
-    }
-
-    // All clusters visited
-    if (nextClusterIdx >= clusters.length) return;
-
-    // If a popup is currently showing, check whether head moved away
+    // If a popup is showing, check if phase has exited its window
     if (activeClusterIdx >= 0) {
       const ac = clusters[activeClusterIdx];
-      if (sqDist(lng, lat, ac.center[0], ac.center[1]) >= popupThreshold2) {
-        hidePopup();
-        nextClusterIdx = activeClusterIdx + 1;
-        activeClusterIdx = -1;
+      if (phase >= ac.startFraction - PHASE_LEAD && phase <= ac.endFraction + PHASE_TRAIL) {
+        return; // still inside window
       }
-      return;
+      // Exited → hide
+      hidePopup();
+      activeClusterIdx = -1;
     }
 
-    // No popup showing — check the next expected cluster
-    if (nextClusterIdx < clusters.length) {
-      const c = clusters[nextClusterIdx];
-      if (sqDist(lng, lat, c.center[0], c.center[1]) < popupThreshold2) {
+    // Find the cluster whose window contains the current phase
+    for (let i = 0; i < clusters.length; i++) {
+      const c = clusters[i];
+      if (phase >= c.startFraction - PHASE_LEAD && phase <= c.endFraction + PHASE_TRAIL) {
         showPopup(c.center, c.marks);
-        activeClusterIdx = nextClusterIdx;
+        activeClusterIdx = i;
+        return;
       }
     }
   }
 
   /**
-   * Hide the popup and reset cursor to the beginning.
-   * Called on pause or animation completion/restart.
+   * Hide the popup and reset state.
    */
   function resetPopup() {
     hidePopup();
     activeClusterIdx = -1;
-    nextClusterIdx = 0;
-    wasInactive = true;
   }
 
   return { updateHeadPosition, resetPopup };
