@@ -36,10 +36,10 @@
           <span class="playback__stat-label">DISTANCE</span>
           <span class="playback__stat-value">{{ formattedDistance }} <small>km</small></span>
         </div>
-        <div class="playback__stat">
+        <!--div class="playback__stat">
           <span class="playback__stat-label">ELEVATION</span>
           <span class="playback__stat-value">{{ formattedElevation }} <small>m</small></span>
-        </div>
+        </div-->
       </div>
       <div class="playback__stats playback__stats--right">
         <div class="playback__stat">
@@ -114,8 +114,8 @@ const {
 /** Dynamic color for the grade stat: green when positive, red when negative */
 const gradeColor = computed(() => {
   const slope = currentProfilePoint.value?.slope_percent ?? 0;
-  if (slope > 0) return '#00c853';
-  if (slope < 0) return '#E64A19';
+  if (slope > 0) return '#E64A19';
+  if (slope < 0) return '#00c853';
   return null;
 });
 
