@@ -86,7 +86,7 @@ export function useRouteAnimation(props, emit) {
 
     // --- Initialize map layers and marks ---
     const { showAnimationLayers, showOverviewLayers } = useMapLayers(map, lineFeature);
-    const { updateHeadPosition, resetPopup } = useMarkers(map, marksData, props.showMarks);
+    const { updateHeadPosition, resetPopup } = useMarkers(map, marksData, props.showMarks, lineFeature, totalDistance);
 
     // --- Speed control (called from speed watcher) ---
     _setSpeed = (newSpeed) => {
