@@ -10,7 +10,7 @@
       "distanceUnit": "km",
       "difficulty": "moderate",
       "type": "Distancia larga",
-      "description": "Un recorrido vibrante de media distancia que combina tramos urbanos rápidos con ligeras ondulaciones. Su dificultad es moderada, ideal para corredores que buscan exigirse sin llegar al fondo maratónico. El clima cálido y húmedo típico de Cali añade un reto adicional, invitando a una buena estrategia de hidratación y ritmo.",
+      "description": "Recorrido certificado por World Athletics.",
       "duration": 300000,
       "zoom": 12
     },
@@ -21,7 +21,7 @@
       "distanceUnit": "km",
       "difficulty": "challenging",
       "type": "Maratón",
-      "description": "Una prueba de resistencia total que atraviesa la diversidad de la ciudad, desde avenidas amplias hasta sectores con desniveles progresivos. La dificultad es alta, pensada para atletas con preparación sólida. El clima cálido, con humedad variable, convierte la maratón en un desafío técnico donde la gestión del esfuerzo es clave.",
+      "description": "Primera maratón de Sur América con sello Elite de World Athletics. Recorrido certificado.",
       "duration": 600000,
       "zoom": 11
     }
