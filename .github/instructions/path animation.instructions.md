@@ -2,7 +2,7 @@
 
 ## 1. Descripción general
 
-Aplicación Vue 3 (Options API) que visualiza rutas de carrera sobre Mapbox GL JS con animación de trayecto, perfil de elevación interactivo y controles de reproducción. Datos centralizados en `event.json`; tema claro/oscuro con CSS custom properties.
+Aplicación Vue 3 (Composition API) que visualiza rutas de carrera sobre Mapbox GL JS con animación de trayecto, perfil de elevación interactivo y controles de reproducción. Datos centralizados en `event.json`; tema claro/oscuro con CSS custom properties. Estado global gestionado progresivamente con Pinia.
 
 ---
 
@@ -15,6 +15,7 @@ src/
   views/          → Vistas conectadas al router (wrappers delgados o orquestadores)
   components/     → Componentes reutilizables de UI
   config/         → Configuración centralizada (Mapbox, etc.)
+  stores/         → Stores Pinia (estado global del playback, grabación, etc.)
   theme/          → Tokens de diseño, mixin de tema, variables CSS
   utils/          → Funciones puras de utilidad (parseElevationCsv, flattenGeoJson)
   composables/    → Composables de dominio (lógica reutilizable)
@@ -28,6 +29,9 @@ src/
 src/
   config/
     mapbox.js               → Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
+  stores/                   → Stores Pinia (estado global)
+    playbackStore.js        → Estado del playback: progress, isPlaying, speed, routeData, elevationProfile
+    recordingStore.js       → Estado de grabación: isRecording, countdown, UI visibility flags
   composables/              → Composables de dominio (lógica reutilizable)
     useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
     useMapLayers.js         → Configuración de sources y layers de Mapbox (full route, animated line, head)
@@ -35,6 +39,7 @@ src/
     useMarkPopup.js         → Popup reutilizable Mapbox GL para mostrar íconos de marcas agrupadas por jerarquía
     useScrub.js             → Interacción de scrub (mouse/touch) en la barra de reproducción
     usePlaybackStats.js     → Estadísticas computadas del playback (distancia, elevación, pendiente, etc.)
+    useScreenRecording.js   → Lógica de grabación de pantalla (MediaRecorder API, countdown, fullscreen)
   theme/
     useTheme.js             → Toggle dark/light, localStorage, cross-tab sync
     tokensToCSS.js          → Generador: tokens.js → CSS custom properties
@@ -95,10 +100,11 @@ Prefijo `VITE_` (requisito Vite). Definidas en `.env`:
 
 ## 3. Patrones de código
 
-### 3.1 Comunicación padre-hijo
+### 3.1 Comunicación padre-hijo y estado global
 
-- **Props down, events up**: el padre (`RouteMapView`) es la única fuente de verdad del estado compartido (`progress`, `isPlaying`, `currentSpeed`).
-- Hijos emiten eventos (`update:progress`, `toggle-play`, `speed-change`); el padre actualiza su `data` y los hijos reciben las actualizaciones por props.
+- **Estado actual (props down, events up)**: el padre (`RouteMapView`) es la fuente de verdad del estado compartido (`progress`, `isPlaying`, `currentSpeed`). Hijos emiten eventos (`update:progress`, `toggle-play`, `speed-change`); el padre actualiza su `data` y los hijos reciben las actualizaciones por props.
+- **Migración progresiva a Pinia**: el estado compartido del playback se trasladará gradualmente a `playbackStore`. Los componentes leerán del store en lugar de recibir props. La migración es incremental — se mantiene compatibilidad con props durante la transición.
+- **Regla de convivencia**: durante la migración, un mismo dato NO debe existir simultáneamente como prop y como store state. Migrar un dato implica: (1) moverlo al store, (2) actualizar todos los consumidores, (3) eliminar la prop del padre.
 
 ### 3.2 Animación del mapa
 
@@ -227,6 +233,145 @@ Archivos modificados: `src/views/RouteMapView.vue`.
   - Tests de componente para `PlayBack` (emit events), `RaceTitle` (render de props).
   - Configurar Vitest o Jest + `@vue/test-utils`.
 
+### 4.10 Implementar Pinia Store y migrar de props a state (prioridad alta)
+
+Migrar progresivamente el estado compartido del playback (actualmente en `RouteMapView` como refs locales + props) a un store Pinia centralizado. Esto simplifica la comunicación entre componentes, elimina prop drilling y facilita el acceso al estado desde composables y el futuro módulo de grabación.
+
+**Fase 1 — Instalación y store base:**
+
+1. Instalar Pinia: `npm install pinia`.
+2. Crear instancia de Pinia en `src/main.js` (`createPinia()`, `app.use(pinia)`).
+3. Crear `src/stores/playbackStore.js` — `defineStore('playback', ...)` con:
+   - **State**: `progress` (0–1), `isPlaying` (bool), `speed` (number), `routeId` (string|null).
+   - **State de datos de ruta**: `pathData`, `marksData`, `elevationProfile`, `totalDistance`, `duration`, `routeConfig`, `loading`, `error`.
+   - **Actions**: `loadRoute(routeId)` (mueve la lógica de carga de `RouteMapView`), `setProgress(val)`, `togglePlay()`, `setSpeed(speed)`, `reset()`.
+   - **Getters**: `eventCity`, `isReady` (pathData loaded y no error).
+
+**Fase 2 — Migrar `RouteMapView` al store:**
+
+4. `RouteMapView` reemplaza refs locales (`progress`, `isPlaying`, `currentSpeed`, `pathData`, etc.) por `storeToRefs(usePlaybackStore())`.
+5. Los handlers de eventos (`onMapProgress`, `onTogglePlay`, etc.) invocan actions del store en lugar de mutar refs locales.
+6. Eliminar la función `loadRouteData()` de `RouteMapView` — ahora vive como action `loadRoute()` en el store.
+7. `RouteMapView` mantiene el watcher de `route.params.routeId` pero llama a `store.loadRoute(routeId)`.
+
+**Fase 3 — Migrar componentes hijos:**
+
+8. `PlayBack.vue`: reemplazar props (`playing`, `progress`, `elevationProfile`, `totalDistance`) por lectura directa del store. Eliminar emits `toggle-play`, `speed-change`; invocar actions del store directamente.
+9. `RouteMap.vue`: reemplazar props (`pathData`, `marksData`, `duration`, `progress`, `playing`, `speed`) por lectura del store. Eliminar emit `update:progress`; el composable `useRouteAnimation` escribe directamente en el store.
+10. `RaceTitle.vue`: reemplazar props por lectura del store (`routeConfig`, `eventCity`).
+11. `ElevationChart.vue`: sin cambios (recibe props de `PlayBack` que ahora lee del store).
+
+**Fase 4 — Adaptar composables:**
+
+12. `useRouteAnimation`: recibe el store en lugar de `(props, emit)`. Lee `store.progress`, `store.isPlaying`, `store.speed` y escribe `store.setProgress()` directamente.
+13. `usePlaybackStats`: recibe el store en lugar de props. Computed values se basan en `store.progress`, `store.elevationProfile`, `store.totalDistance`.
+14. `useScrub`: recibe el store; invoca `store.setProgress()` en lugar de `emit('update:progress')`.
+
+**Fase 5 — Limpieza:**
+
+15. Eliminar props obsoletas de `RouteMapView` → hijos.
+16. Eliminar emits obsoletos de componentes hijos.
+17. Verificar que no queden refs locales duplicando state del store.
+18. Actualizar `RouteMapView` template: los componentes hijos ya no necesitan bindings de props/events para estado del playback.
+
+Archivos nuevos: `src/stores/playbackStore.js`.  
+Archivos modificados: `main.js`, `RouteMapView.vue`, `RouteMap.vue`, `PlayBack.vue`, `RaceTitle.vue`, `useRouteAnimation.js`, `usePlaybackStats.js`, `useScrub.js`.  
+Dependencia nueva: `pinia`.
+
+### 4.11 Mejorar rendimiento y estabilidad de la animación del mapa (prioridad alta)
+
+Solucionar problemas de rendimiento visual en la animación: la cabeza de ruta (head marker) se retrasa respecto a la posición real, los popups de marcas vibran/tiemblan mientras son visibles, y las transiciones de cámara presentan motion blur e inestabilidad.
+
+**Fase 1 — Estabilizar la cabeza de ruta (head marker):**
+
+1. **Reemplazar el circle layer por un HTML marker**: el `headLayer` (circle layer de Mapbox) se actualiza con `setData()` cada frame, lo que causa retraso porque Mapbox re-renderiza el tile. Migrar a un `mapboxgl.Marker` con elemento HTML custom (`div` con CSS), posicionado con `marker.setLngLat()` — se actualiza en el DOM directamente, sin pasar por el pipeline de rendering de Mapbox.
+2. **Sincronizar head con cámara**: actualmente `updateDisplay()` llama `computeCameraPosition()` (que usa `jumpTo`) y luego `setData()` para el head. Invertir el orden o unificar: actualizar head position ANTES de mover la cámara, y usar `map.project()`/`map.unproject()` si es necesario para mantener coherencia visual.
+3. **Reducir overhead de `setData()`**: si se mantiene como source layer, usar `map.getSource('head').setData()` con el GeoJSON mínimo (sin reconstruir el objeto completo cada frame). Considerar `updateImage()` para sources de tipo image si aplica.
+
+**Fase 2 — Estabilizar popups de marcas (vibración):**
+
+4. **Fijar popup con `trackPointer: false`**: verificar que el popup de `useMarkPopup` no tenga `trackPointer` habilitado. Usar `popup.setLngLat(fixedCoord)` una sola vez al mostrar y no actualizar la posición en frames subsiguientes.
+5. **Desacoplar popup del frame loop**: actualmente `updateHeadPosition()` se llama cada frame desde `updateDisplay()`. El popup solo necesita evaluación cuando el `phase` cruza un umbral de cluster (entrada/salida). Agregar un mecanismo de debounce o check por delta de phase: solo evaluar clusters si `|phase - lastCheckedPhase| > MIN_DELTA` (ej. 0.0005).
+6. **Usar coordenadas fijas de cluster**: asegurar que `showPopup(c.center, c.marks)` use coordenadas del cluster pre-calculadas (ya lo hace), y que el popup NO se reposicione si ya está mostrando el mismo cluster.
+
+**Fase 3 — Suavizar transiciones de cámara:**
+
+7. **Reemplazar `jumpTo` por interpolación manual**: `computeCameraPosition()` actualmente usa `map.jumpTo()` (cuando `smooth=true`), lo que causa saltos discretos frame a frame. Implementar interpolación tipo lerp entre la posición actual de la cámara y la posición objetivo, con un factor de suavizado (ej. `alpha = 0.08`). Esto crea un efecto de "cámara con inercia" que elimina el motion blur percibido.
+8. **Calcular bearing de forma continua**: el bearing actual `startBearing - phase * 300.0` genera un giro constante. Considerar derivar el bearing del ángulo tangente a la ruta (`turf.bearing` entre punto actual y punto `+N` metros adelante) para que la cámara siga la dirección natural del recorrido.
+9. **Ajustar duración de `flyTo` en pause/resume**: las transiciones `flyTo` con `duration: 3000–4000ms` son lentas. Reducir a `2000ms` y usar `essential: true` para evitar que el usuario las interrumpa inadvertidamente. Considerar `easing` customizado para suavizar la desaceleración.
+
+**Fase 4 — Optimización general del frame loop:**
+
+10. **Batch DOM updates**: agrupar las llamadas a `setData()` y `setPaintProperty()` dentro de un solo bloque para minimizar repaints.
+11. **Throttle de `emit('update:progress')`**: actualmente se emite cada frame (~60fps). Limitar a ~20 emisiones/segundo usando un timestamp check — suficiente para la UI del PlayBack sin saturar la reactividad de Vue.
+12. **Pre-calcular coordenadas por fase**: en lugar de llamar `turf.along()` cada frame (costoso), pre-calcular un array de coordenadas muestreadas (ej. 1000 puntos) durante `setup()` y buscar por índice en el frame loop (lookup O(1) vs cálculo O(n)).
+
+Archivos modificados: `useRouteAnimation.js`, `useMapLayers.js`, `useMarkers.js`, `useMarkPopup.js`.  
+Archivos nuevos: ninguno (refactoring interno de composables existentes).
+
+### 4.12 Módulo de grabación de pantalla (prioridad media)
+
+Implementar un sistema de grabación de la animación del mapa para exportar video. Incluye un botón de grabación, countdown visual, modo fullscreen sin controles, y captura vía MediaRecorder API.
+
+**Fase 1 — Store de grabación:**
+
+1. Crear `src/stores/recordingStore.js` — `defineStore('recording', ...)` con:
+   - **State**: `isRecording` (bool), `isCountingDown` (bool), `countdown` (3, 2, 1, 0), `recordingBlob` (Blob|null), `uiHidden` (bool).
+   - **Getters**: `isPreparingOrRecording` (countdown o recording activo).
+   - **Actions**: `startRecordingFlow()`, `stopRecording()`, `resetRecording()`.
+
+**Fase 2 — Composable `useScreenRecording`:**
+
+2. Crear `src/composables/useScreenRecording.js`:
+   - `startRecordingFlow(container)` — orquesta la secuencia completa:
+     a. Resetear el playback al inicio (`playbackStore.reset()` o `playbackStore.setProgress(0)` + `playbackStore.pause()`).
+     b. Activar fullscreen en el contenedor de la ruta (`container.requestFullscreen()`).
+     c. Ocultar controles: `recordingStore.uiHidden = true` (PlayBack y botón de grabación se ocultan vía `v-show`).
+     d. Iniciar countdown de 3 a 1 (con `setTimeout` o `requestAnimationFrame`, ~1s por step).
+     e. Al llegar a 0: iniciar `MediaRecorder` sobre un stream del canvas (`container.captureStream(30)` ó `navigator.mediaDevices.getDisplayMedia()`).
+     f. Iniciar playback: `playbackStore.play()`.
+   - `stopRecording()` — detiene MediaRecorder, sale de fullscreen, restaura visibilidad de controles, genera Blob y ofrece descarga.
+   - `onAnimationComplete()` — callback que detiene la grabación cuando la animación llega a `progress === 1`.
+
+**Fase 3 — Componente `RecordButton.vue`:**
+
+3. Crear `src/components/RecordButton.vue`:
+   - Botón circular con ícono de grabación (●) posicionado sobre el mapa.
+   - `v-show="!recordingStore.uiHidden"` — se oculta durante la grabación.
+   - Click invoca `useScreenRecording.startRecordingFlow()`.
+   - BEM: `.record-btn`, `.record-btn__icon`, `.record-btn--active`.
+
+4. Crear `src/components/icons/IconRecord.vue`:
+   - Ícono SVG de círculo relleno (●) con props `size` y `color`.
+
+**Fase 4 — Overlay de countdown:**
+
+5. Crear `src/components/RecordCountdown.vue`:
+   - Overlay fullscreen semitransparente con número grande (3, 2, 1) centrado.
+   - Animación CSS de scale + fade por cada step.
+   - `v-if="recordingStore.isCountingDown"` — visible solo durante countdown.
+   - BEM: `.record-countdown`, `.record-countdown__number`, `.record-countdown__overlay`.
+
+**Fase 5 — Integración en `RouteMapView`:**
+
+6. Agregar `RecordButton` y `RecordCountdown` al template de `RouteMapView`.
+7. `PlayBack` y `RaceTitle` reciben visibilidad condicional durante grabación:
+   - `PlayBack`: `v-show="!recordingStore.uiHidden"` para controles, pero el perfil de elevación y stats permanecen visibles (extraer a sub-componente si es necesario o aplicar visibilidad granular con CSS).
+   - `RaceTitle`: `v-show="!recordingStore.uiHidden"` — se oculta durante grabación.
+   - Alternativa: aplicar clase CSS `.recording-mode` al contenedor y ocultar elementos con `display: none` selectivo.
+8. Conectar el evento de fin de animación (`progress === 1`) con `stopRecording()`.
+
+**Fase 6 — Descarga y limpieza:**
+
+9. Al finalizar la grabación, generar URL del Blob y disparar descarga automática como `.webm` (o `.mp4` si el codec está soportado).
+10. Restaurar: salir de fullscreen, mostrar controles, resetear `recordingStore`.
+11. Manejar edge cases: usuario presiona Escape durante fullscreen, error en MediaRecorder, navegador sin soporte.
+
+**Nota sobre captura**: `HTMLCanvasElement.captureStream()` requiere que el mapa Mapbox use `preserveDrawingBuffer: true` en la inicialización. Verificar impacto en rendimiento y agregar esta opción condicionalmente (solo cuando se activa grabación, o re-inicializar el mapa). Alternativa: `navigator.mediaDevices.getDisplayMedia()` captura toda la pantalla sin necesidad de `preserveDrawingBuffer`, pero requiere permiso del usuario.
+
+Archivos nuevos: `src/stores/recordingStore.js`, `src/composables/useScreenRecording.js`, `src/components/RecordButton.vue`, `src/components/RecordCountdown.vue`, `src/components/icons/IconRecord.vue`.  
+Archivos modificados: `RouteMapView.vue`, `PlayBack.vue`, `RouteMap.vue` (agregar `preserveDrawingBuffer`), `tokens.js` (tokens de z-index y colores para countdown overlay).
+
 ---
 
 ## 5. Reglas para contribuir
@@ -234,7 +379,7 @@ Archivos modificados: `src/views/RouteMapView.vue`.
 ### 5.1 Reglas generales
 
 1. **No hardcodear colores ni tamaños**: usar siempre `var(--token)` en CSS o importar `tokens` en JS.
-2. **No duplicar estado**: la fuente de verdad del playback está en `RouteMapView`; nunca mantener estado duplicado en hijos.
+2. **No duplicar estado**: la fuente de verdad del playback está en el store Pinia (`playbackStore`); durante la migración puede estar temporalmente en `RouteMapView`. Nunca mantener estado duplicado en hijos.
 3. **Lazy-load assets pesados**: usar `import()` dinámico para GeoJSON, CSVs y vistas.
 4. **Comentar closures complejas**: las funciones de animación en `useRouteAnimation` deben documentar qué variables capturan y por qué.
 5. **Mantener event.json actualizado**: toda ruta nueva requiere su entrada aquí con todos los campos requeridos (`id`, `name`, `distance`, `distanceUnit`, `difficulty`, `type`, `description`, `duration`, `zoom`).
@@ -269,9 +414,9 @@ Al implementar una nueva funcionalidad, seguir este checklist:
    - Actualizar `tokensToCSS.js` si se agregan nuevas categorías de tokens.
 
 4. **Integración con estado existente**:
-   - Si la feature afecta el playback, respetar el flujo unidireccional: hijos emiten eventos → `RouteMapView` actualiza estado → hijos reciben por props.
-   - Si requiere nuevo estado compartido, agregarlo en `RouteMapView` (fuente de verdad).
-   - Si la feature es independiente del playback, puede manejar su propio estado local.
+   - **Con Pinia (preferido)**: si la feature afecta el playback o la grabación, usar el store correspondiente (`playbackStore`, `recordingStore`). Leer estado con `storeToRefs()`, mutar con actions.
+   - **Sin Pinia (legacy)**: si la feature afecta componentes que aún no se han migrado al store, respetar el flujo unidireccional: hijos emiten eventos → padre actualiza estado → hijos reciben por props.
+   - Si la feature es independiente del playback, puede manejar su propio estado local o crear un store dedicado si otros componentes lo necesitan.
 
 5. **Testing y verificación**:
    - Ejecutar `npm run build` y verificar que no haya errores.

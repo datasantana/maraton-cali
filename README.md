@@ -10,7 +10,7 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 
 | Capa | Tecnología |
 |---|---|
-| Framework | **Vue 3** (Composition API, `<script setup>`) + Vue Router 4 |
+| Framework | **Vue 3** (Composition API, `<script setup>`) + Vue Router 4 + **Pinia** (migración en progreso) |
 | Mapa | **Mapbox GL JS 3.12** |
 | Cálculos geoespaciales | **Turf.js 3** (`turf.along`, `turf.lineDistance`) |
 | Build | **Vite 6** (Rollup) |
@@ -24,17 +24,22 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 
 ```
 src/
-├── main.js                  # Punto de entrada — monta App, router, CSS global
+├── main.js                  # Punto de entrada — monta App, router, Pinia, CSS global
 ├── App.vue                  # Shell con <router-view/> y useTheme composable
 │
 ├── router/index.js          # Rutas: / (home), /about, /route/:routeId
+│
+├── stores/
+│   ├── playbackStore.js     # (Planificado) Estado global del playback y datos de ruta
+│   └── recordingStore.js    # (Planificado) Estado de grabación de pantalla
 │
 ├── composables/
 │   ├── useRouteAnimation.js # Composable de animación del mapa (frame loop, controles)
 │   ├── useMapLayers.js      # Configuración de sources y layers de Mapbox
 │   ├── useMarkers.js        # Sistema de marcas (actualmente inactivo)
 │   ├── useScrub.js          # Interacción de scrub (mouse/touch) en barra de reproducción
-│   └── usePlaybackStats.js  # Estadísticas computadas del playback
+│   ├── usePlaybackStats.js  # Estadísticas computadas del playback
+│   └── useScreenRecording.js # (Planificado) Lógica de grabación de pantalla
 │
 ├── config/
 │   └── mapbox.js            # Configuración centralizada de Mapbox (token, style, center, zoom, pitch)
@@ -55,7 +60,9 @@ src/
 │   ├── RaceTitle.vue        # Overlay con nombre, tipo, ciudad y dificultad de la ruta
 │   ├── LoadingSpinner.vue   # Spinner animado reutilizable con mensaje opcional
 │   ├── ErrorMessage.vue     # Mensaje de error reutilizable con botón de retry
-│   └── icons/               # Componentes SVG icon reutilizables (IconPlay, IconPause, etc.)
+│   ├── RecordButton.vue     # (Planificado) Botón de grabación de pantalla
+│   ├── RecordCountdown.vue  # (Planificado) Overlay countdown 3-2-1 para grabación
+│   └── icons/               # Componentes SVG icon reutilizables (IconPlay, IconPause, IconRecord, etc.)
 │
 ├── theme/
 │   ├── index.js             # Barrel export (useTheme + tokens)
@@ -101,11 +108,11 @@ event.json ──▶ EventHome (orquestador) ──▶ router-link /route/:id
                   useMapLayers useMarkers (camera/frame)
 ```
 
-1. **`RouteMapView`** carga dinámicamente los assets (`.geojson` + `.csv`) según el `routeId`.
-2. Es la **única fuente de verdad** del estado de reproducción (`progress`, `isPlaying`, `currentSpeed`).
+1. **`RouteMapView`** carga dinámicamente los assets (`.geojson` + `.csv`) según el `routeId`. (Migrará a `playbackStore.loadRoute()`).
+2. Es la **única fuente de verdad** del estado de reproducción (`progress`, `isPlaying`, `currentSpeed`). (Migrará a `playbackStore`).
 3. **`RouteMap`** ejecuta la animación vía `requestAnimationFrame` y emite `update:progress`.
 4. **`PlayBack`** muestra stats (distancia, elevación, pendiente, ascenso acumulado, tiempo) y permite scrub/play/pause/speed.
-5. La comunicación es **parent-driven**: los hijos emiten eventos, el padre actualiza props compartidas.
+5. La comunicación es **parent-driven**: los hijos emiten eventos, el padre actualiza props compartidas. (Migrando progresivamente a Pinia store).
 
 ### Sistema de temas
 
