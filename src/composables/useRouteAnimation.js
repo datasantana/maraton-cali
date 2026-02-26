@@ -60,13 +60,60 @@ export function useRouteAnimation(store) {
     const marksData = store.marksData;
     const duration = store.duration;
     const showMarks = true;
-    const startBearing = 0;
 
     // Extract the LineString feature (first feature in the FeatureCollection)
     const lineFeature = pathData.features[0];
 
     // Pre-calculate the total distance of the path (2D; turf ignores the 3rd coordinate)
     const totalDistance = turf.lineDistance(lineFeature);
+
+    // --- Pre-compute sampled coordinates lookup table (T12) -----------------
+    // Instead of calling turf.along() every frame (O(n) per call), we sample
+    // NUM_SAMPLES points along the route once during setup and store them.
+    // The frame loop then does a simple array index lookup: O(1).
+    const NUM_SAMPLES = 1000;
+    const sampledCoords = new Array(NUM_SAMPLES + 1);
+    for (let i = 0; i <= NUM_SAMPLES; i++) {
+      const d = (i / NUM_SAMPLES) * totalDistance;
+      const pt = turf.along(lineFeature, d);
+      sampledCoords[i] = pt.geometry.coordinates; // [lng, lat]
+    }
+
+    /**
+     * Fast coordinate lookup by animation phase (0–1).
+     * Uses the pre-computed sampledCoords array with linear interpolation
+     * between the two nearest samples for sub-sample accuracy.
+     *
+     * @param {number} phase - Animation phase 0–1
+     * @returns {[number, number]} [lng, lat]
+     */
+    function coordAtPhase(phase) {
+      const t = Math.max(0, Math.min(1, phase)) * NUM_SAMPLES;
+      const idx = Math.min(Math.floor(t), NUM_SAMPLES - 1);
+      const frac = t - idx;
+      const a = sampledCoords[idx];
+      const b = sampledCoords[idx + 1];
+      return [
+        a[0] + (b[0] - a[0]) * frac,
+        a[1] + (b[1] - a[1]) * frac,
+      ];
+    }
+
+    /**
+     * Compute bearing from the route tangent at the given phase (T8).
+     * Uses turf.bearing between the current point and a point slightly ahead
+     * on the route for a natural camera orientation.
+     *
+     * @param {number} phase - Animation phase 0–1
+     * @returns {number} Bearing in degrees
+     */
+    function bearingAtPhase(phase) {
+      const lookAhead = Math.min(phase + 0.005, 1); // ~5 m ahead on the lookup
+      const current = coordAtPhase(phase);
+      const ahead = coordAtPhase(lookAhead);
+      // turf.bearing returns degrees (-180 to 180)
+      return turf.bearing(turf.point(current), turf.point(ahead));
+    }
 
     // Animation state variables (plain JS — no reactivity needed)
     let startTime;
@@ -75,6 +122,15 @@ export function useRouteAnimation(store) {
     let speed = store.speed;
     let hasStarted = false;    // Whether the animation has ever been started
     let savedCameraState = null;
+
+    // Camera lerp state (T7) — smooth interpolation eliminates jumpTo jitter
+    let camCenter = null;      // Current interpolated camera center [lng, lat]
+    let camBearing = 0;        // Current interpolated bearing
+
+    // Throttle state for store.setProgress (T11)
+    let lastProgressTimestamp = 0;
+    /** Minimum ms between store.setProgress calls (~20 fps) */
+    const PROGRESS_THROTTLE_MS = 50;
 
     _internalPhase = 0;
 
@@ -102,9 +158,47 @@ export function useRouteAnimation(store) {
       }
     };
 
-    // --- Camera position computation ---
-    const computeCameraPosition = (pitch, bearing, targetPosition, altitude, smooth = false) => {
-      const bearingInRadian = bearing / 57.29;
+    // --- Camera position computation (T7: lerp interpolation) ----------------
+    // Camera lerp factor: 0 = no movement, 1 = instant snap.
+    // 0.08 gives a smooth "camera with inertia" effect that eliminates
+    // the motion-blur caused by the old frame-by-frame jumpTo.
+    const CAM_LERP_ALPHA = 0.08;
+
+    /**
+     * Linear interpolation helper.
+     * @param {number} a - Start value
+     * @param {number} b - End value
+     * @param {number} t - Interpolation factor 0–1
+     * @returns {number}
+     */
+    const lerp = (a, b, t) => a + (b - a) * t;
+
+    /**
+     * Interpolate bearing accounting for the ±180° wraparound.
+     * Ensures the camera always takes the shortest rotation path.
+     */
+    const lerpBearing = (a, b, t) => {
+      let diff = b - a;
+      // Normalise to -180..180
+      while (diff > 180) diff -= 360;
+      while (diff < -180) diff += 360;
+      return a + diff * t;
+    };
+
+    /**
+     * Compute the ideal camera center (offset from target by pitch/bearing/altitude)
+     * and apply smooth lerp interpolation before sending to the map.
+     *
+     * Replaces the old jumpTo with a lerp that converges toward the target
+     * each frame, producing a fluid "inertia camera" effect.
+     *
+     * @param {number} pitch
+     * @param {number} targetBearing
+     * @param {[number,number]} targetPosition - [lng, lat] of the route head
+     * @param {number} altitude
+     */
+    const computeCameraPosition = (pitch, targetBearing, targetPosition, altitude) => {
+      const bearingInRadian = targetBearing / 57.29;
       const pitchInRadian = (90 - pitch) / 57.29;
 
       const lngDiff =
@@ -112,42 +206,54 @@ export function useRouteAnimation(store) {
       const latDiff =
         ((altitude * Math.tan(pitchInRadian)) * Math.cos(-bearingInRadian)) / 110000;
 
-      const newCameraPosition = {
-        center: [targetPosition[0] + lngDiff, targetPosition[1] - latDiff],
+      const idealCenter = [
+        targetPosition[0] + lngDiff,
+        targetPosition[1] - latDiff,
+      ];
+
+      // First frame or after seek: snap instantly, then lerp from there
+      if (!camCenter) {
+        camCenter = idealCenter;
+        camBearing = targetBearing;
+      } else {
+        camCenter = [
+          lerp(camCenter[0], idealCenter[0], CAM_LERP_ALPHA),
+          lerp(camCenter[1], idealCenter[1], CAM_LERP_ALPHA),
+        ];
+        camBearing = lerpBearing(camBearing, targetBearing, CAM_LERP_ALPHA);
+      }
+
+      map.jumpTo({
+        center: camCenter,
         zoom: 17,
         pitch,
-        bearing,
-      };
-      if (smooth) {
-        map.jumpTo(newCameraPosition);
-      } else {
-        map.easeTo(newCameraPosition);
-      }
-      return newCameraPosition;
+        bearing: camBearing,
+      });
     };
 
     // --- Display update helper (used by both animation frame and seek) ---
+    // Batches all visual updates (head marker, popup, camera, line gradient)
+    // into a single function to minimize repaints (T10).
     const updateDisplay = (phase, moveCamera = true) => {
-      const currentDistance = totalDistance * phase;
-      const { coordinates } = turf.along(lineFeature, currentDistance).geometry;
-      const [lng, lat] = coordinates;
+      // Fast O(1) coordinate lookup from the pre-computed table (T12)
+      const [lng, lat] = coordAtPhase(phase);
 
+      // ── Batch 1: DOM updates (no Mapbox GL render pipeline) ──────────
       // Update the head marker BEFORE the camera to keep them in sync
       headMarker.setLngLat([lng, lat]);
 
-      // Update mark popup (proximity-based, only active during animation)
+      // Update mark popup (proximity-based, debounced by phase delta)
       updateHeadPosition(lng, lat, phase, !isPaused);
 
+      // ── Batch 2: Mapbox GL state updates ─────────────────────────────
       if (moveCamera) {
-        const bearing = startBearing - phase * 300.0;
-        computeCameraPosition(45, bearing, [lng, lat], 50, true);
+        // Bearing derived from route tangent for natural camera orientation (T8)
+        const bearing = bearingAtPhase(phase);
+        // Lerp-smoothed camera positioning (T7)
+        computeCameraPosition(45, bearing, [lng, lat], 50);
       }
 
-      // Two-tone gradient on the route line
-      // Uses a single interpolate expression with a near-instant transition to
-      // transparent at the leading edge. Avoids `case` + `<` which causes a
-      // second-line rendering artifact in the gradient texture.
-      // Reference: https://www.mapbox.com/blog/building-cinematic-route-animations-with-mapboxgl
+      // Two-tone gradient on the route line (single Mapbox paint call)
       const safePhase = Math.max(phase, 0.0001);
       map.setPaintProperty('lineLayer', 'line-gradient', [
         'interpolate',
@@ -175,8 +281,12 @@ export function useRouteAnimation(store) {
       // Track internal phase for seek-detection in the progress watcher
       _internalPhase = animationPhase;
 
-      // Write current progress directly to the store
-      store.setProgress(animationPhase);
+      // Throttled store progress update (T11): ~20 emissions/sec instead of ~60.
+      // Sufficient for PlayBack UI reactivity without saturating Vue.
+      if (time - lastProgressTimestamp >= PROGRESS_THROTTLE_MS || animationPhase >= 1) {
+        store.setProgress(animationPhase);
+        lastProgressTimestamp = time;
+      }
 
       updateDisplay(animationPhase);
 
@@ -188,6 +298,7 @@ export function useRouteAnimation(store) {
         _restartTimeout = setTimeout(() => {
           startTime = undefined;
           _internalPhase = 0;
+          camCenter = null; // Reset lerp for clean restart
           store.setProgress(0);
           _animationFrame = window.requestAnimationFrame(frame);
         }, 1500);
@@ -209,14 +320,16 @@ export function useRouteAnimation(store) {
         showAnimationLayers();
 
         // Fly to start point of route (pitch 45, zoom 17)
-        // Duration doubled to let tiles load before animation begins
+        // Reduced duration (T9) + essential:true to prevent user interruption
         const startCoords = lineFeature.geometry.coordinates[0];
+        camCenter = null; // Reset lerp state for clean start
         map.flyTo({
           center: [startCoords[0], startCoords[1]],
           zoom: 17,
           pitch: 45,
           bearing: 0,
-          duration: 4000,
+          duration: 2000,
+          essential: true,
         });
 
         map.once('moveend', () => {
@@ -232,10 +345,12 @@ export function useRouteAnimation(store) {
         showAnimationLayers();
 
         if (savedCameraState) {
-          // Duration doubled to let tiles load before animation resumes
+          // Reduced duration (T9) + essential:true for snappier resume
+          camCenter = null; // Reset lerp state so it re-converges smoothly
           map.flyTo({
             ...savedCameraState,
-            duration: 3000,
+            duration: 2000,
+            essential: true,
           });
 
           map.once('moveend', () => {
@@ -278,14 +393,16 @@ export function useRouteAnimation(store) {
         resetPopup();
 
         // Fly to fit route extent, top-down view
-        // Duration doubled for smoother overview transition
+        // Reduced duration (T9) + essential:true + easeOutQuad easing
         const fitCamera = map.cameraForBounds(routeBounds, { padding: 50 });
         map.flyTo({
           center: fitCamera.center,
           zoom: fitCamera.zoom,
           pitch: 0,
           bearing: 0,
-          duration: 3000,
+          duration: 2000,
+          essential: true,
+          easing: (t) => t * (2 - t),  // easeOutQuad — smooth deceleration
         });
       }
     };
@@ -301,6 +418,9 @@ export function useRouteAnimation(store) {
       // Adjust startTime so animation phase matches the target
       startTime = effectiveNow - clampedPhase * (duration / speed);
       _internalPhase = clampedPhase;
+
+      // Reset camera lerp state so it snaps to the new position on seek
+      camCenter = null;
 
       // Update display — skip camera movement when paused (overview mode)
       updateDisplay(clampedPhase, !isPaused);

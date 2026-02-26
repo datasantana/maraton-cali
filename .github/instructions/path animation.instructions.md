@@ -33,7 +33,7 @@ src/
     playbackStore.js        → Estado del playback: progress, isPlaying, speed, routeData, elevationProfile
     recordingStore.js       → Estado de grabación: isRecording, countdown, UI visibility flags
   composables/              → Composables de dominio (lógica reutilizable)
-    useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
+    useRouteAnimation.js    → Animación del mapa (frame loop con coord lookup O(1), cámara lerp con inercia, bearing tangente, throttled progress ~20fps, delega capas a useMapLayers)
     useMapLayers.js         → Sources y layers de Mapbox (full route, animated line) + HTML head marker (mapboxgl.Marker, posicionado con setLngLat)
     useMarkers.js           → Marcas de KM (círculos naranja siempre visibles) + popup de proximidad con geofence de fase y debounce (MIN_PHASE_DELTA)
     useMarkPopup.js         → Popup reutilizable Mapbox GL con cache de cluster (trackPointer:false, closeOnMove:false) — no reposiciona si mismo cluster ya visible
@@ -294,17 +294,17 @@ Solucionar problemas de rendimiento visual en la animación: la cabeza de ruta (
 5. ~~**Desacoplar popup del frame loop**~~: se agregó un mecanismo de debounce por delta de phase en `useMarkers.updateHeadPosition()`. Solo evalúa clusters si `|phase - lastCheckedPhase| > MIN_PHASE_DELTA` (0.0005 = ~21 m en 42 km). Esto reduce las evaluaciones de ~60/s a solo cuando el head ha avanzado una distancia significativa.
 6. ~~**Usar coordenadas fijas de cluster**~~: `showPopup(c.center, c.marks)` ya usaba coordenadas pre-calculadas del cluster, pero se llamaba repetidamente dentro de la ventana de fase. Ahora `show()` en `useMarkPopup` compara un cache key (`lng,lat`) y no reposiciona si el mismo cluster ya está visible. `lastCheckedPhase` se resetea en `resetPopup()` y al pausar.
 
-**Fase 3 — Suavizar transiciones de cámara:**
+**Fase 3 — Suavizar transiciones de cámara: ✅ COMPLETADA**
 
-7. **Reemplazar `jumpTo` por interpolación manual**: `computeCameraPosition()` actualmente usa `map.jumpTo()` (cuando `smooth=true`), lo que causa saltos discretos frame a frame. Implementar interpolación tipo lerp entre la posición actual de la cámara y la posición objetivo, con un factor de suavizado (ej. `alpha = 0.08`). Esto crea un efecto de "cámara con inercia" que elimina el motion blur percibido.
-8. **Calcular bearing de forma continua**: el bearing actual `startBearing - phase * 300.0` genera un giro constante. Considerar derivar el bearing del ángulo tangente a la ruta (`turf.bearing` entre punto actual y punto `+N` metros adelante) para que la cámara siga la dirección natural del recorrido.
-9. **Ajustar duración de `flyTo` en pause/resume**: las transiciones `flyTo` con `duration: 3000–4000ms` son lentas. Reducir a `2000ms` y usar `essential: true` para evitar que el usuario las interrumpa inadvertidamente. Considerar `easing` customizado para suavizar la desaceleración.
+7. ~~**Reemplazar `jumpTo` por interpolación manual**~~: `computeCameraPosition()` ahora usa lerp (linear interpolation) con `CAM_LERP_ALPHA = 0.08` entre la posición actual de la cámara (`camCenter`, `camBearing`) y la posición objetivo. El `jumpTo` se mantiene como primitiva final pero recibe coordenadas ya suavizadas, creando un efecto de "cámara con inercia" que elimina el motion blur frame a frame. Se incluye `lerpBearing()` con wraparound ±180° para rotación por el camino más corto. El estado `camCenter` se resetea a `null` en seek, restart y transiciones flyTo para re-converger instantáneamente.
+8. ~~**Calcular bearing de forma continua**~~: el bearing constante `startBearing - phase * 300.0` fue reemplazado por `bearingAtPhase(phase)` que calcula el ángulo tangente a la ruta usando `turf.bearing` entre el punto actual y un punto ~0.5% de la ruta más adelante. Esto hace que la cámara siga la dirección natural del recorrido en curvas.
+9. ~~**Ajustar duración de `flyTo` en pause/resume**~~: todas las transiciones `flyTo` reducidas de 3000–4000ms a `2000ms`. Se agregó `essential: true` para evitar interrupciones inadvertidas del usuario. La transición de pause (fit bounds) incluye `easing: (t) => t * (2 - t)` (easeOutQuad) para desaceleración suave.
 
-**Fase 4 — Optimización general del frame loop:**
+**Fase 4 — Optimización general del frame loop: ✅ COMPLETADA**
 
-10. **Batch DOM updates**: agrupar las llamadas a `setData()` y `setPaintProperty()` dentro de un solo bloque para minimizar repaints.
-11. **Throttle de `emit('update:progress')`**: actualmente se emite cada frame (~60fps). Limitar a ~20 emisiones/segundo usando un timestamp check — suficiente para la UI del PlayBack sin saturar la reactividad de Vue.
-12. **Pre-calcular coordenadas por fase**: en lugar de llamar `turf.along()` cada frame (costoso), pre-calcular un array de coordenadas muestreadas (ej. 1000 puntos) durante `setup()` y buscar por índice en el frame loop (lookup O(1) vs cálculo O(n)).
+10. ~~**Batch DOM updates**~~: `updateDisplay()` fue reestructurado en dos bloques explícitos: Batch 1 (DOM puro: `headMarker.setLngLat()` + `updateHeadPosition()`) y Batch 2 (Mapbox GL: `computeCameraPosition()` + `setPaintProperty('line-gradient')`). Esto minimiza el intercalado entre operaciones DOM y WebGL.
+11. ~~**Throttle de `store.setProgress()`**~~: se agregó un timestamp check (`PROGRESS_THROTTLE_MS = 50`) en el frame loop. `store.setProgress()` solo se llama si han pasado ≥50ms desde la última emisión (~20 fps), o si `phase >= 1` (para garantizar que el final siempre se notifica). Reduce la carga de reactividad Vue de ~60 a ~20 actualizaciones/segundo.
+12. ~~**Pre-calcular coordenadas por fase**~~: durante `setup()` se pre-computa un array de `NUM_SAMPLES = 1000` puntos a lo largo de la ruta usando `turf.along()`. La función `coordAtPhase(phase)` hace un lookup O(1) por índice con interpolación lineal entre las dos muestras más cercanas. Elimina el costoso `turf.along()` del frame loop. `bearingAtPhase()` también opera sobre este array via `coordAtPhase()`.
 
 Archivos modificados: `useRouteAnimation.js`, `useMapLayers.js`, `useMarkers.js`, `useMarkPopup.js`.  
 Archivos nuevos: ninguno (refactoring interno de composables existentes).

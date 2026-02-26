@@ -34,7 +34,7 @@ src/
 │   └── recordingStore.js    # (Planificado) Estado de grabación de pantalla
 │
 ├── composables/
-│   ├── useRouteAnimation.js # Composable de animación del mapa (frame loop, controles)
+│   ├── useRouteAnimation.js # Animación del mapa (frame loop con coord lookup O(1), cámara lerp, throttled progress)
 │   ├── useMapLayers.js      # Sources/layers de Mapbox + HTML head marker (mapboxgl.Marker)
 │   ├── useMarkers.js        # Marcas KM + popup por geofence de fase con debounce
 │   ├── useMarkPopup.js      # (implícito) Popup reutilizable con cache de cluster (trackPointer:false)
