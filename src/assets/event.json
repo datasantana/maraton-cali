@@ -11,7 +11,7 @@
       "difficulty": "easy",
       "type": "Distancia corta",
       "description": "Ruta ideal para principiantes o para quienes buscan una experiencia más relajada. Perfecta para disfrutar del paisaje sin la presión de una distancia larga.",
-      "duration": 100000,
+      "duration": 300000,
       "zoom": 14
     },
     {
@@ -22,7 +22,7 @@
       "difficulty": "moderate",
       "type": "Distancia larga",
       "description": "Ruta para corredores con experiencia que buscan un desafío mayor. Ideal para quienes desean poner a prueba su resistencia y disfrutar de un recorrido más extenso.",
-      "duration": 300000,
+      "duration": 600000,
       "zoom": 12
     }
   ]
