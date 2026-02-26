@@ -85,7 +85,7 @@ export function useRouteAnimation(store) {
     });
 
     // --- Initialize map layers and marks ---
-    const { showAnimationLayers, showOverviewLayers } = useMapLayers(map, lineFeature);
+    const { showAnimationLayers, showOverviewLayers, headMarker } = useMapLayers(map, lineFeature);
     const { updateHeadPosition, resetPopup } = useMarkers(map, marksData, showMarks, lineFeature, totalDistance);
 
     // --- Speed control (called from speed watcher) ---
@@ -132,19 +132,16 @@ export function useRouteAnimation(store) {
       const { coordinates } = turf.along(lineFeature, currentDistance).geometry;
       const [lng, lat] = coordinates;
 
+      // Update the head marker BEFORE the camera to keep them in sync
+      headMarker.setLngLat([lng, lat]);
+
+      // Update mark popup (proximity-based, only active during animation)
+      updateHeadPosition(lng, lat, phase, !isPaused);
+
       if (moveCamera) {
         const bearing = startBearing - phase * 300.0;
         computeCameraPosition(45, bearing, [lng, lat], 50, true);
       }
-
-      // Update the head circle
-      map.getSource('head').setData({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [lng, lat] },
-      });
-
-      // Update mark popup (proximity-based, only active during animation)
-      updateHeadPosition(lng, lat, phase, !isPaused);
 
       // Two-tone gradient on the route line
       // Uses a single interpolate expression with a near-instant transition to
