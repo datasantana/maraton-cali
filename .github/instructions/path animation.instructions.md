@@ -237,7 +237,7 @@ Archivos modificados: `src/views/RouteMapView.vue`.
 
 Migrar progresivamente el estado compartido del playback (actualmente en `RouteMapView` como refs locales + props) a un store Pinia centralizado. Esto simplifica la comunicación entre componentes, elimina prop drilling y facilita el acceso al estado desde composables y el futuro módulo de grabación.
 
-**Fase 1 — Instalación y store base:**
+**Fase 1 — Instalación y store base (✅ completada):**
 
 1. Instalar Pinia: `npm install pinia`.
 2. Crear instancia de Pinia en `src/main.js` (`createPinia()`, `app.use(pinia)`).
@@ -247,27 +247,27 @@ Migrar progresivamente el estado compartido del playback (actualmente en `RouteM
    - **Actions**: `loadRoute(routeId)` (mueve la lógica de carga de `RouteMapView`), `setProgress(val)`, `togglePlay()`, `setSpeed(speed)`, `reset()`.
    - **Getters**: `eventCity`, `isReady` (pathData loaded y no error).
 
-**Fase 2 — Migrar `RouteMapView` al store:**
+**Fase 2 — Migrar `RouteMapView` al store (✅ completada):**
 
 4. `RouteMapView` reemplaza refs locales (`progress`, `isPlaying`, `currentSpeed`, `pathData`, etc.) por `storeToRefs(usePlaybackStore())`.
 5. Los handlers de eventos (`onMapProgress`, `onTogglePlay`, etc.) invocan actions del store en lugar de mutar refs locales.
 6. Eliminar la función `loadRouteData()` de `RouteMapView` — ahora vive como action `loadRoute()` en el store.
 7. `RouteMapView` mantiene el watcher de `route.params.routeId` pero llama a `store.loadRoute(routeId)`.
 
-**Fase 3 — Migrar componentes hijos:**
+**Fase 3 — Migrar componentes hijos (✅ completada):**
 
 8. `PlayBack.vue`: reemplazar props (`playing`, `progress`, `elevationProfile`, `totalDistance`) por lectura directa del store. Eliminar emits `toggle-play`, `speed-change`; invocar actions del store directamente.
 9. `RouteMap.vue`: reemplazar props (`pathData`, `marksData`, `duration`, `progress`, `playing`, `speed`) por lectura del store. Eliminar emit `update:progress`; el composable `useRouteAnimation` escribe directamente en el store.
 10. `RaceTitle.vue`: reemplazar props por lectura del store (`routeConfig`, `eventCity`).
 11. `ElevationChart.vue`: sin cambios (recibe props de `PlayBack` que ahora lee del store).
 
-**Fase 4 — Adaptar composables:**
+**Fase 4 — Adaptar composables (✅ completada):**
 
 12. `useRouteAnimation`: recibe el store en lugar de `(props, emit)`. Lee `store.progress`, `store.isPlaying`, `store.speed` y escribe `store.setProgress()` directamente.
 13. `usePlaybackStats`: recibe el store en lugar de props. Computed values se basan en `store.progress`, `store.elevationProfile`, `store.totalDistance`.
 14. `useScrub`: recibe el store; invoca `store.setProgress()` en lugar de `emit('update:progress')`.
 
-**Fase 5 — Limpieza:**
+**Fase 5 — Limpieza (✅ completada):**
 
 15. Eliminar props obsoletas de `RouteMapView` → hijos.
 16. Eliminar emits obsoletos de componentes hijos.

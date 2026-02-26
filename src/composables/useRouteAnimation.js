@@ -3,15 +3,14 @@
  *
  * Manages:
  *  - `requestAnimationFrame` loop (frame → updateDisplay → camera)
- *  - Play / pause / speed / seek controls (driven by parent via props)
+ *  - Play / pause / speed / seek controls (driven by the Pinia playbackStore)
  *
  * Delegates layer management to useMapLayers and marks to useMarkers.
  *
  * Captured closure variables (startTime, isPaused, speed, …) avoid Vue
  * reactivity overhead for high-frequency animation state.
  *
- * @param {Object} props  - Component props (pathData, marksData, duration, progress, playing, speed, showMarks)
- * @param {Function} emit - Component emit function
+ * @param {import('pinia').Store} store - The playback Pinia store instance
  * @returns {{ setup: (map: mapboxgl.Map) => void }}
  */
 
@@ -22,7 +21,7 @@ import tokens from '@/theme/tokens';
 import { useMapLayers } from '@/composables/useMapLayers';
 import { useMarkers } from '@/composables/useMarkers';
 
-export function useRouteAnimation(props, emit) {
+export function useRouteAnimation(store) {
   // Control closures — assigned inside setup() once the map + data are ready
   let _seekToPhase = null;
   let _togglePause = null;
@@ -33,17 +32,17 @@ export function useRouteAnimation(props, emit) {
 
   // --- External-control watchers (reference mutable closures) ----------------
 
-  watch(() => props.progress, (newVal) => {
+  watch(() => store.progress, (newVal) => {
     if (_seekToPhase && Math.abs(newVal - _internalPhase) > 0.002) {
       _seekToPhase(newVal);
     }
   });
 
-  watch(() => props.playing, (newVal) => {
+  watch(() => store.isPlaying, (newVal) => {
     if (_togglePause) _togglePause(newVal);
   });
 
-  watch(() => props.speed, (newVal) => {
+  watch(() => store.speed, (newVal) => {
     if (_setSpeed) _setSpeed(newVal);
   });
 
@@ -57,9 +56,10 @@ export function useRouteAnimation(props, emit) {
   // ---------------------------------------------------------------------------
 
   function setup(map) {
-    const pathData = props.pathData;
-    const marksData = props.marksData;
-    const duration = props.duration;
+    const pathData = store.pathData;
+    const marksData = store.marksData;
+    const duration = store.duration;
+    const showMarks = true;
     const startBearing = 0;
 
     // Extract the LineString feature (first feature in the FeatureCollection)
@@ -72,7 +72,7 @@ export function useRouteAnimation(props, emit) {
     let startTime;
     let isPaused = true;       // Always start paused — user must press play
     let pauseTimestamp = performance.now();
-    let speed = props.speed;
+    let speed = store.speed;
     let hasStarted = false;    // Whether the animation has ever been started
     let savedCameraState = null;
 
@@ -86,7 +86,7 @@ export function useRouteAnimation(props, emit) {
 
     // --- Initialize map layers and marks ---
     const { showAnimationLayers, showOverviewLayers } = useMapLayers(map, lineFeature);
-    const { updateHeadPosition, resetPopup } = useMarkers(map, marksData, props.showMarks, lineFeature, totalDistance);
+    const { updateHeadPosition, resetPopup } = useMarkers(map, marksData, showMarks, lineFeature, totalDistance);
 
     // --- Speed control (called from speed watcher) ---
     _setSpeed = (newSpeed) => {
@@ -178,8 +178,8 @@ export function useRouteAnimation(props, emit) {
       // Track internal phase for seek-detection in the progress watcher
       _internalPhase = animationPhase;
 
-      // Notify parent of the current progress
-      emit('update:progress', animationPhase);
+      // Write current progress directly to the store
+      store.setProgress(animationPhase);
 
       updateDisplay(animationPhase);
 
@@ -191,7 +191,7 @@ export function useRouteAnimation(props, emit) {
         _restartTimeout = setTimeout(() => {
           startTime = undefined;
           _internalPhase = 0;
-          emit('update:progress', 0);
+          store.setProgress(0);
           _animationFrame = window.requestAnimationFrame(frame);
         }, 1500);
       }

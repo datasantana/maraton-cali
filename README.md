@@ -10,7 +10,7 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 
 | Capa | Tecnología |
 |---|---|
-| Framework | **Vue 3** (Composition API, `<script setup>`) + Vue Router 4 + **Pinia** (migración en progreso) |
+| Framework | **Vue 3** (Composition API, `<script setup>`) + Vue Router 4 + **Pinia** |
 | Mapa | **Mapbox GL JS 3.12** |
 | Cálculos geoespaciales | **Turf.js 3** (`turf.along`, `turf.lineDistance`) |
 | Build | **Vite 6** (Rollup) |
@@ -24,13 +24,13 @@ Aplicación web interactiva para visualizar las rutas de la **Maratón de Cali 2
 
 ```
 src/
-├── main.js                  # Punto de entrada — monta App, router, Pinia, CSS global
+├── main.js                  # Punto de entrada — monta App, router, Pinia (createPinia), CSS global
 ├── App.vue                  # Shell con <router-view/> y useTheme composable
 │
 ├── router/index.js          # Rutas: / (home), /about, /route/:routeId
 │
 ├── stores/
-│   ├── playbackStore.js     # (Planificado) Estado global del playback y datos de ruta
+│   ├── playbackStore.js     # Estado global del playback y datos de ruta (Pinia)
 │   └── recordingStore.js    # (Planificado) Estado de grabación de pantalla
 │
 ├── composables/
@@ -96,23 +96,29 @@ event.json ──▶ EventHome (orquestador) ──▶ router-link /route/:id
                               ┌───────┼───────┐
                               ▼       ▼       ▼
                          RouteMap  PlayBack  RaceTitle
-                              │    ┌──┼──┐
-                              │    ▼  ▼  ▼
-                              │  ElevationChart
-                              │  useScrub
-                              │  usePlaybackStats
-                              ▼
-                     useRouteAnimation
-                       ┌──────┼──────┐
-                       ▼      ▼      ▼
-                  useMapLayers useMarkers (camera/frame)
+                              │    ┌──┼──┐      │
+                              │    ▼  ▼  ▼      │
+                              │  ElevChart       │
+                              │  useScrub         │
+                              │  usePlaybackStats │
+                              ▼                   │
+                     useRouteAnimation         │
+                       ┌──────┼──────┐    │
+                       ▼      ▼      ▼    │
+                  useMapLayers useMarkers  │
+                              │           │
+                     ────────▼─────────▼───
+                     │   playbackStore (Pinia)  │
+                     ──────────────────────────
 ```
 
-1. **`RouteMapView`** carga dinámicamente los assets (`.geojson` + `.csv`) según el `routeId`. (Migrará a `playbackStore.loadRoute()`).
-2. Es la **única fuente de verdad** del estado de reproducción (`progress`, `isPlaying`, `currentSpeed`). (Migrará a `playbackStore`).
-3. **`RouteMap`** ejecuta la animación vía `requestAnimationFrame` y emite `update:progress`.
-4. **`PlayBack`** muestra stats (distancia, elevación, pendiente, ascenso acumulado, tiempo) y permite scrub/play/pause/speed.
-5. La comunicación es **parent-driven**: los hijos emiten eventos, el padre actualiza props compartidas. (Migrando progresivamente a Pinia store).
+1. **`RouteMapView`** delega la carga de assets al store: `playbackStore.loadRoute(routeId)`. Es un orquestador ligero que sólo gestiona el watcher de ruta y el error boundary.
+2. La **fuente de verdad** del estado de reproducción (`progress`, `isPlaying`, `speed`) y los datos de ruta (`pathData`, `elevationProfile`, etc.) es `playbackStore`.
+3. **`RouteMap`** lee el store directamente vía `useRouteAnimation(store)`, que escribe `store.setProgress()` cada frame y lee `store.isPlaying`/`store.speed`.
+4. **`PlayBack`** lee el store con `storeToRefs()` e invoca actions (`store.togglePlay()`, `store.setSpeed()`, `store.setProgress()` vía `useScrub(store)`).
+5. **`RaceTitle`** lee `store.routeConfig` y `store.eventCity` directamente.
+6. **`ElevationChart`** sigue recibiendo props de `PlayBack` (componente presentacional puro).
+7. La comunicación es **store-driven**: no hay prop drilling ni emits para el estado del playback. La única prop que `RouteMapView` pasa es `fullscreenContainer` a `RouteMap`.
 
 ### Sistema de temas
 
