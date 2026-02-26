@@ -34,9 +34,9 @@ src/
     recordingStore.js       → Estado de grabación: isRecording, countdown, UI visibility flags
   composables/              → Composables de dominio (lógica reutilizable)
     useRouteAnimation.js    → Animación del mapa (frame loop, controles, delega capas a useMapLayers)
-    useMapLayers.js         → Configuración de sources y layers de Mapbox (full route, animated line, head)
-    useMarkers.js           → Marcas de KM (círculos naranja siempre visibles) + popup de proximidad durante animación
-    useMarkPopup.js         → Popup reutilizable Mapbox GL para mostrar íconos de marcas agrupadas por jerarquía
+    useMapLayers.js         → Sources y layers de Mapbox (full route, animated line) + HTML head marker (mapboxgl.Marker, posicionado con setLngLat)
+    useMarkers.js           → Marcas de KM (círculos naranja siempre visibles) + popup de proximidad con geofence de fase y debounce (MIN_PHASE_DELTA)
+    useMarkPopup.js         → Popup reutilizable Mapbox GL con cache de cluster (trackPointer:false, closeOnMove:false) — no reposiciona si mismo cluster ya visible
     useScrub.js             → Interacción de scrub (mouse/touch) en la barra de reproducción
     usePlaybackStats.js     → Estadísticas computadas del playback (distancia, elevación, pendiente, etc.)
     useScreenRecording.js   → Lógica de grabación de pantalla (MediaRecorder API, countdown, fullscreen)
@@ -282,17 +282,17 @@ Dependencia nueva: `pinia`.
 
 Solucionar problemas de rendimiento visual en la animación: la cabeza de ruta (head marker) se retrasa respecto a la posición real, los popups de marcas vibran/tiemblan mientras son visibles, y las transiciones de cámara presentan motion blur e inestabilidad.
 
-**Fase 1 — Estabilizar la cabeza de ruta (head marker):**
+**Fase 1 — Estabilizar la cabeza de ruta (head marker): ✅ COMPLETADA**
 
-1. **Reemplazar el circle layer por un HTML marker**: el `headLayer` (circle layer de Mapbox) se actualiza con `setData()` cada frame, lo que causa retraso porque Mapbox re-renderiza el tile. Migrar a un `mapboxgl.Marker` con elemento HTML custom (`div` con CSS), posicionado con `marker.setLngLat()` — se actualiza en el DOM directamente, sin pasar por el pipeline de rendering de Mapbox.
-2. **Sincronizar head con cámara**: actualmente `updateDisplay()` llama `computeCameraPosition()` (que usa `jumpTo`) y luego `setData()` para el head. Invertir el orden o unificar: actualizar head position ANTES de mover la cámara, y usar `map.project()`/`map.unproject()` si es necesario para mantener coherencia visual.
-3. **Reducir overhead de `setData()`**: si se mantiene como source layer, usar `map.getSource('head').setData()` con el GeoJSON mínimo (sin reconstruir el objeto completo cada frame). Considerar `updateImage()` para sources de tipo image si aplica.
+1. ~~**Reemplazar el circle layer por un HTML marker**~~: migrado a `mapboxgl.Marker` con elemento HTML custom (`div` con CSS, `will-change: transform`), posicionado con `marker.setLngLat()`. Se eliminó el source GeoJSON `head` y el layer `headLayer` de `useMapLayers`. La visibilidad se controla con `display: none/block` en `showAnimationLayers()`/`showOverviewLayers()`.
+2. ~~**Sincronizar head con cámara**~~: en `updateDisplay()` se reordenó para que `headMarker.setLngLat()` y `updateHeadPosition()` se ejecuten ANTES de `computeCameraPosition()`, eliminando el desfase visual.
+3. ~~**Reducir overhead de `setData()`**~~: eliminado por completo — ya no existe la source GeoJSON `head` ni la llamada `map.getSource('head').setData(...)`. El reemplazo por `headMarker.setLngLat([lng, lat])` es una operación de DOM puro (CSS transform), sin pasar por el pipeline de rendering de Mapbox.
 
-**Fase 2 — Estabilizar popups de marcas (vibración):**
+**Fase 2 — Estabilizar popups de marcas (vibración): ✅ COMPLETADA**
 
-4. **Fijar popup con `trackPointer: false`**: verificar que el popup de `useMarkPopup` no tenga `trackPointer` habilitado. Usar `popup.setLngLat(fixedCoord)` una sola vez al mostrar y no actualizar la posición en frames subsiguientes.
-5. **Desacoplar popup del frame loop**: actualmente `updateHeadPosition()` se llama cada frame desde `updateDisplay()`. El popup solo necesita evaluación cuando el `phase` cruza un umbral de cluster (entrada/salida). Agregar un mecanismo de debounce o check por delta de phase: solo evaluar clusters si `|phase - lastCheckedPhase| > MIN_DELTA` (ej. 0.0005).
-6. **Usar coordenadas fijas de cluster**: asegurar que `showPopup(c.center, c.marks)` use coordenadas del cluster pre-calculadas (ya lo hace), y que el popup NO se reposicione si ya está mostrando el mismo cluster.
+4. ~~**Fijar popup con `trackPointer: false`**~~: se agregó `trackPointer: false` y `closeOnMove: false` explícitamente al constructor del popup en `useMarkPopup`. Además, `show()` ahora cachea la `lngLat` del cluster activo y cuando se llama repetidamente con las mismas coordenadas (mismo cluster) es un no-op — ya no se reposiciona ni reconstruye HTML cada frame.
+5. ~~**Desacoplar popup del frame loop**~~: se agregó un mecanismo de debounce por delta de phase en `useMarkers.updateHeadPosition()`. Solo evalúa clusters si `|phase - lastCheckedPhase| > MIN_PHASE_DELTA` (0.0005 = ~21 m en 42 km). Esto reduce las evaluaciones de ~60/s a solo cuando el head ha avanzado una distancia significativa.
+6. ~~**Usar coordenadas fijas de cluster**~~: `showPopup(c.center, c.marks)` ya usaba coordenadas pre-calculadas del cluster, pero se llamaba repetidamente dentro de la ventana de fase. Ahora `show()` en `useMarkPopup` compara un cache key (`lng,lat`) y no reposiciona si el mismo cluster ya está visible. `lastCheckedPhase` se resetea en `resetPopup()` y al pausar.
 
 **Fase 3 — Suavizar transiciones de cámara:**
 

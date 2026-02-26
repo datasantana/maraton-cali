@@ -35,8 +35,9 @@ src/
 │
 ├── composables/
 │   ├── useRouteAnimation.js # Composable de animación del mapa (frame loop, controles)
-│   ├── useMapLayers.js      # Configuración de sources y layers de Mapbox
-│   ├── useMarkers.js        # Sistema de marcas (actualmente inactivo)
+│   ├── useMapLayers.js      # Sources/layers de Mapbox + HTML head marker (mapboxgl.Marker)
+│   ├── useMarkers.js        # Marcas KM + popup por geofence de fase con debounce
+│   ├── useMarkPopup.js      # (implícito) Popup reutilizable con cache de cluster (trackPointer:false)
 │   ├── useScrub.js          # Interacción de scrub (mouse/touch) en barra de reproducción
 │   ├── usePlaybackStats.js  # Estadísticas computadas del playback
 │   └── useScreenRecording.js # (Planificado) Lógica de grabación de pantalla
