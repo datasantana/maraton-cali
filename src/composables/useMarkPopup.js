@@ -79,12 +79,22 @@ function injectPopupStyles() {
 }
 
 /**
- * Resolve an asset path (relative to src/assets/) to a Vite-compatible URL.
- * @param {string} path - Relative path like "assets/dist_mark.png"
- * @returns {string} Resolved URL
+ * Eagerly import all mark images at build time so Vite includes them
+ * in the production bundle with hashed filenames.
+ * Keys are like '../assets/dist_mark.png'; values are resolved URLs.
+ */
+const markImageModules = import.meta.glob('../assets/*_mark.png', { eager: true, import: 'default' });
+
+/**
+ * Resolve a GeoJSON asset path (e.g. "assets/dist_mark.png") to a
+ * Vite-resolved URL that works in both dev and production builds.
+ * @param {string} path - Relative path from GeoJSON (e.g. "assets/dist_mark.png")
+ * @returns {string|null} Resolved URL or null if not found
  */
 function resolveAssetUrl(path) {
-  return new URL('../' + path, import.meta.url).href;
+  // GeoJSON stores "assets/foo_mark.png"; glob keys are "../assets/foo_mark.png"
+  const key = '../' + path;
+  return markImageModules[key] ?? null;
 }
 
 /**
@@ -100,6 +110,7 @@ function buildPopupHTML(mark, isLight) {
   if (!imgPath) return '';
 
   const imgUrl = resolveAssetUrl(imgPath);
+  if (!imgUrl) return '';
   const label = mark.label
     ? `<span class="mark-popup__label">${mark.label}</span>`
     : '';
