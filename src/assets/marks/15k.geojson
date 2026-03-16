@@ -21,6 +21,6 @@
 { "type": "Feature", "properties": { "distance": 9750.0, "angle": 243.98463292421167, "name": "Service", "label": null, "path_l": "assets/gatorade_mark.png", "path_d": "assets/gatorade_mark.png" }, "geometry": { "type": "Point", "coordinates": [ -76.537952115905227, 3.451349825960275 ] } },
 { "type": "Feature", "properties": { "distance": 10000.0, "angle": 270.0, "name": "Dist", "label": "10 k", "path_l": "assets/dist_mark.png", "path_d": "assets/dist_mark.png" }, "geometry": { "type": "Point", "coordinates": [ -76.539591238794742, 3.450472792882485 ] } },
 { "type": "Feature", "properties": { "distance": 9000.0, "angle": 236.95464947541873, "name": "Dist", "label": "9 k", "path_l": "assets/dist_mark.png", "path_d": "assets/dist_mark.png" }, "geometry": { "type": "Point", "coordinates": [ -76.534046014888432, 3.455209332528016 ] } },
-{ "type": "Feature", "properties": { "distance": 14000.0, "angle": 203.35104058428752, "name": "Dist, Service", "label": "14 k", "path_l": "assets/distgato_mark.png", "path_d": "assets/distgato_mark.png" }, "geometry": { "type": "Point", "coordinates": [ -76.543209043788053, 3.417675916375302 ] } }
+{ "type": "Feature", "properties": { "distance": 14000.0, "angle": 203.35104058428752, "name": "Dist, Service", "label": "14 k", "path_l": "assets/dist_mark.png", "path_d": "assets/dist_mark.png" }, "geometry": { "type": "Point", "coordinates": [ -76.543209043788053, 3.417675916375302 ] } }
 ]
 }
